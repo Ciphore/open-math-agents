@@ -8313,8 +8313,6 @@ theorem extract_aux (hreg : κ.IsRegular) (hθ : θ < κ) (c : (ℕ → Pt κ) �
     · grind;
     · grind +locals
 
-set_option maxHeartbeats 1600000 in
-
 end EHG
 end Erdos593
 end
@@ -8563,88 +8561,6 @@ variable {W : Type u}
 def shadowGraph (H : Hypergraph W) : SimpleGraph W :=
   SimpleGraph.fromRel (fun u v => ∃ e ∈ H.edges, u ∈ e ∧ v ∈ e)
 
-theorem shadow_uncountablyChromatic (H : Hypergraph W)
-    (htri : H.IsTripleSystem) (huc : H.UncountablyChromatic) :
-    (SimpleGraph.toHG (shadowGraph H)).UncountablyChromatic := by
-  contrapose! huc
-  obtain ⟨c, hc⟩ := Classical.not_not.1 huc
-  simp_all +decide [Hypergraph.UncountablyChromatic]
-  use c
-  intro e he
-  specialize htri e he
-  obtain ⟨a, b, d, hab, hbd, had⟩ := Set.ncard_eq_three.mp htri
-  simp_all +decide [SimpleGraph.toHG]
-  have := hc {a, b}
-  simp_all +decide [shadowGraph]
-  grind
-
-theorem shadowGraph_adj_of_mem_edge (H : Hypergraph W) {e : Set W} (he : e ∈ H.edges)
-    {u v : W} (hu : u ∈ e) (hv : v ∈ e) (huv : u ≠ v) :
-    (shadowGraph H).Adj u v := by
-  rw [shadowGraph, SimpleGraph.fromRel_adj]
-  exact ⟨huv, Or.inl ⟨e, he, hu, hv⟩⟩
-
-theorem linear_edge_unique_of_pair (H : Hypergraph W) (hlin : H.Linear)
-    {e₁ e₂ : Set W} (he₁ : e₁ ∈ H.edges) (he₂ : e₂ ∈ H.edges)
-    {u v : W} (huv : u ≠ v)
-    (hu₁ : u ∈ e₁) (hv₁ : v ∈ e₁) (hu₂ : u ∈ e₂) (hv₂ : v ∈ e₂) :
-    e₁ = e₂ := by
-  by_contra hne
-  exact huv (hlin e₁ he₁ e₂ he₂ hne ⟨hu₁, hu₂⟩ ⟨hv₁, hv₂⟩)
-
-theorem colorable_of_countable_edges (H : Hypergraph W)
-    (htri : H.IsTripleSystem) (hcnt : H.edges.Countable) :
-    H.ColorableBy ℵ₀ := by
-  classical
-  set S : Set W := ⋃₀ H.edges with hS
-  have hScnt : S.Countable := by
-    apply Set.Countable.sUnion hcnt
-    intro e he
-    have h3 := htri e he
-    rw [Set.ncard_eq_three] at h3
-    obtain ⟨a, b, c, -, -, -, rfl⟩ := h3
-    exact (Set.toFinite _).countable
-  obtain ⟨ι, hι⟩ := hScnt.exists_injective_nat
-  have hInf : Infinite ((ℵ₀ : Cardinal).out) :=
-    Cardinal.infinite_iff.mpr (by rw [Cardinal.mk_out])
-  set g : ℕ ↪ (ℵ₀ : Cardinal).out := Infinite.natEmbedding _ with hg
-  refine ⟨fun w => if h : w ∈ S then g (ι ⟨w, h⟩) else g 0, ?_⟩
-  intro e he
-  have h3 := htri e he
-  rw [Set.ncard_eq_three] at h3
-  obtain ⟨x, y, z, hxy, hxz, hyz, rfl⟩ := h3
-  have hxS : x ∈ S := Set.subset_sUnion_of_mem he (by simp)
-  have hyS : y ∈ S := Set.subset_sUnion_of_mem he (by simp)
-  refine ⟨x, by simp, y, by simp, ?_⟩
-  simp only [dif_pos hxS, dif_pos hyS]
-  intro hcontra
-  exact hxy (congrArg Subtype.val (hι (g.injective hcontra)))
-
-theorem uncountable_edges_of_uncountablyChromatic (H : Hypergraph W)
-    (htri : H.IsTripleSystem) (huc : H.UncountablyChromatic) :
-    ¬ H.edges.Countable :=
-  fun hcnt => huc (colorable_of_countable_edges H htri hcnt)
-
-theorem triple_edge_private_vertex (H : Hypergraph W) (htri : H.IsTripleSystem)
-    {e : Set W} (he : e ∈ H.edges) {a b : W} (hab : a ≠ b)
-    (ha : a ∈ e) (hb : b ∈ e) :
-    ∃! y, y ∈ e ∧ y ≠ a ∧ y ≠ b := by
-  obtain ⟨c, hc⟩ : ∃ c : W, c ∈ e ∧ c ≠ a ∧ c ≠ b := by
-    contrapose! htri;
-    exact fun h => by have := h e he; rw [ show e = { a, b } by ext x; by_cases hx : x = a <;> aesop ] at this; simp +decide [ hab ] at this;
-  refine' ⟨ c, hc, fun y hy => _ ⟩;
-  have := htri e he; rw [ Set.ncard_eq_three ] at this; obtain ⟨ x, y, z, hx, hy, hz, h ⟩ := this; simp_all +decide ;
-  grind
-
-theorem triple_edge_eq_pair_insert (H : Hypergraph W) (htri : H.IsTripleSystem)
-    {e : Set W} (he : e ∈ H.edges) {a b y : W} (hab : a ≠ b)
-    (ha : a ∈ e) (hb : b ∈ e) (hy : y ∈ e) (hya : y ≠ a) (hyb : y ≠ b) :
-    e = {a, b, y} := by
-  have h_card : e.ncard = 3 := by
-    exact htri e he;
-  rw [ @Set.ncard_eq_three ] at h_card;
-  grind
-
 structure Loose7Witness (H : Hypergraph W) where
   core : Fin 7 → W
   priv : Fin 7 → W
@@ -8652,99 +8568,8 @@ structure Loose7Witness (H : Hypergraph W) where
   edge_mem : ∀ i : Fin 7,
     ({core i, core (i + 1), priv i} : Set W) ∈ H.edges
 
-theorem looseCycle7_embeds_of_witness (H : Hypergraph W) (w : Loose7Witness H) :
-    looseCycle7.Embeds H := by
-  use fun x => Sum.elim w.core w.priv x;
-  refine' ⟨ _, _ ⟩;
-  · exact w.injective;
-  · simp +decide [ looseCycle7 ];
-    simp +decide [ Set.image_insert_eq, Set.image_singleton ];
-    exact fun i => w.edge_mem i
-
-theorem loose7Witness_of_embeds (H : Hypergraph W) (h : looseCycle7.Embeds H) :
-    Nonempty (Loose7Witness H) := by
-  obtain ⟨ f, hf ⟩ := h;
-  refine' ⟨ ⟨ fun i => f ( Sum.inl i ), fun i => f ( Sum.inr i ), _, _ ⟩ ⟩;
-  · intro x y hxy;
-    cases x <;> cases y <;> simp_all +decide [ hf.1.eq_iff ];
-  · intro i;
-    convert hf.2 _ _;
-    rotate_left;
-    exact { Sum.inl i, Sum.inl ( i + 1 ), Sum.inr i };
-    · fin_cases i <;> simp +decide [ looseCycle7 ];
-    · grind
-
-theorem looseCycle7_embeds_iff_witness (H : Hypergraph W) :
-    looseCycle7.Embeds H ↔ Nonempty (Loose7Witness H) := by
-  exact ⟨ fun h => loose7Witness_of_embeds H h, fun h => looseCycle7_embeds_of_witness H ( Classical.choice h ) ⟩
-
-theorem sum_elim_injective_of_disjoint
-    {x y : Fin 7 → W} (hx : Function.Injective x) (hy : Function.Injective y)
-    (hxy : ∀ i j, x i ≠ y j) : Function.Injective (Sum.elim x y) := by
-  intro a b; cases a <;> cases b <;> simp_all +decide [ hx.eq_iff, hy.eq_iff ] ;
-  exact Ne.symm ( hxy _ _ )
-
-theorem looseCycle7_embeds_of_core_private
-    (H : Hypergraph W) (x y : Fin 7 → W)
-    (hx : Function.Injective x) (hy : Function.Injective y)
-    (hxy : ∀ i j, x i ≠ y j)
-    (hedge : ∀ i : Fin 7, ({x i, x (i + 1), y i} : Set W) ∈ H.edges) :
-    looseCycle7.Embeds H := by
-  apply looseCycle7_embeds_of_witness;
-  exact ⟨ x, y, sum_elim_injective_of_disjoint hx hy hxy, hedge ⟩
-
 def edgesMeeting (H : Hypergraph W) (S : Set W) : Set (Set W) :=
   {e | e ∈ H.edges ∧ (e ∩ S).Nonempty}
-
-theorem triple_edge_has_other (H : Hypergraph W) (htri : H.IsTripleSystem)
-    {e : Set W} (he : e ∈ H.edges) (u : W) :
-    ∃ v ∈ e, v ≠ u := by
-  have h_card : e.ncard = 3 := by
-    exact htri e he;
-  exact Set.exists_ne_of_one_lt_ncard ( by linarith ) u
-
-theorem colorable_edgesMeeting (H : Hypergraph W) (htri : H.IsTripleSystem)
-    {S : Set W} (hS : S.Countable) :
-    (⟨edgesMeeting H S⟩ : Hypergraph W).ColorableBy ℵ₀ := by
-  classical
-  letI : Countable S := hS.to_subtype
-  let c : W → S ⊕ Unit := fun w =>
-    if hw : w ∈ S then Sum.inl ⟨w, hw⟩ else Sum.inr ()
-  apply colorableBy_aleph0_of_countable (T := S ⊕ Unit)
-      (⟨edgesMeeting H S⟩ : Hypergraph W) Cardinal.mk_le_aleph0
-  show (⟨edgesMeeting H S⟩ : Hypergraph W).ProperColoring c
-  intro e he
-  rcases he.2 with ⟨u, hue, huS⟩
-  obtain ⟨v, hve, hvu⟩ := triple_edge_has_other H htri he.1 u
-  refine ⟨u, hue, v, hve, ?_⟩
-  by_cases hvS : v ∈ S
-  · simp only [c, dif_pos huS, dif_pos hvS]
-    intro huv
-    have huv' : (⟨u, huS⟩ : S) = ⟨v, hvS⟩ := Sum.inl.inj huv
-    exact hvu (congrArg Subtype.val huv').symm
-  · simp [c, huS, hvS]
-
-theorem uncountablyChromatic_avoid_countable (H : Hypergraph W)
-    (htri : H.IsTripleSystem) (huc : H.UncountablyChromatic)
-    {S : Set W} (hS : S.Countable) :
-    (⟨{e | e ∈ H.edges ∧ e ⊆ Sᶜ}⟩ : Hypergraph W).UncountablyChromatic := by
-  have h_diff : (⟨H.edges \ edgesMeeting H S⟩ : Hypergraph W).UncountablyChromatic := by
-    convert uncountablyChromatic_diff H.edges ( edgesMeeting H S ) huc ( colorable_edgesMeeting H htri hS ) using 1;
-  convert h_diff using 2 ; ext ; simp +decide [ edgesMeeting ];
-  simp +contextual [ Set.subset_def, Set.Nonempty ]
-
-theorem exists_edge_disjoint_countable (H : Hypergraph W)
-    (htri : H.IsTripleSystem) (huc : H.UncountablyChromatic)
-    {S : Set W} (hS : S.Countable) :
-    ∃ e ∈ H.edges, e ⊆ Sᶜ := by
-  contrapose! huc;
-  convert colorable_edgesMeeting H htri hS using 1;
-  constructor <;> intro h <;> simp_all +decide [ Hypergraph.UncountablyChromatic ];
-  · convert colorable_edgesMeeting H htri hS using 1;
-  · obtain ⟨ c, hc ⟩ := h;
-    use c;
-    intro e he; specialize hc e; simp_all +decide [ edgesMeeting ] ;
-    exact hc ( by simpa [ Set.not_subset ] using huc e he )
 
 structure CleanLoose7EdgeCycle (H : Hypergraph W) where
   core : Fin 7 → W
@@ -8756,305 +8581,15 @@ structure CleanLoose7EdgeCycle (H : Hypergraph W) where
   core_mem_iff : ∀ i j, core j ∈ edge i ↔ j = i ∨ j = i + 1
   inter_subset_core : ∀ ⦃i j⦄, i ≠ j → edge i ∩ edge j ⊆ Set.range core
 
-theorem looseCycle7_embeds_of_cleanEdgeCycle (H : Hypergraph W)
-    (htri : H.IsTripleSystem) (c : CleanLoose7EdgeCycle H) :
-    looseCycle7.Embeds H := by
-      obtain ⟨core, edge, core_injective, edge_mem, left_mem, right_mem, core_mem_iff, inter_subset_core⟩ := c;
-      obtain ⟨p, hp⟩ : ∃ p : Fin 7 → W, (∀ i, p i ∈ edge i ∧ p i ≠ core i ∧ p i ≠ core (i + 1)) ∧ (∀ i j, i ≠ j → p i ≠ p j) ∧ (∀ i j, p i ≠ core j) := by
-        obtain ⟨p, hp⟩ : ∃ p : Fin 7 → W, (∀ i, p i ∈ edge i ∧ p i ≠ core i ∧ p i ≠ core (i + 1)) := by
-          have hp_exists : ∀ i, ∃ p : W, p ∈ edge i ∧ p ≠ core i ∧ p ≠ core (i + 1) := by
-            intro i
-            have h_card : (edge i).ncard = 3 := by
-              exact htri _ ( edge_mem i )
-            have h_core : core i ∈ edge i ∧ core (i + 1) ∈ edge i := by
-              exact ⟨ left_mem i, right_mem i ⟩
-            have h_distinct : core i ≠ core (i + 1) := by
-              exact core_injective.ne ( by fin_cases i <;> trivial )
-            have h_card_core : (edge i \ {core i, core (i + 1)}).ncard = 1 := by
-              rw [ Set.ncard_diff _ _ ] <;> simp_all +decide [ Set.ncard_eq_toFinset_card' ];
-              simp_all +decide [ Set.insert_subset_iff ]
-            obtain ⟨p, hp⟩ : ∃ p, p ∈ edge i \ {core i, core (i + 1)} := by
-              exact Set.nonempty_of_ncard_ne_zero ( h_card_core.symm ▸ by decide )
-            use p
-            simp [hp];
-            exact ⟨ hp.1, by rintro rfl; exact hp.2 ( by simp +decide ), by rintro rfl; exact hp.2 ( by simp +decide ) ⟩;
-          exact ⟨ fun i => Classical.choose ( hp_exists i ), fun i => Classical.choose_spec ( hp_exists i ) ⟩;
-        refine' ⟨ p, hp, _, _ ⟩;
-        · intro i j hij h_eq
-          have h_common : p i ∈ edge i ∩ edge j := by
-            grind;
-          grind;
-        · intro i j hij; specialize hp i; specialize core_mem_iff i j; aesop;
-      convert looseCycle7_embeds_of_core_private H core p _ _ _ _ using 1;
-      · assumption;
-      · exact fun i j hij => Classical.not_not.1 fun hi => hp.2.1 i j hi hij;
-      · exact fun i j => Ne.symm ( hp.2.2 j i );
-      · intro i
-        have h_edge : edge i = {core i, core (i + 1), p i} := by
-          apply triple_edge_eq_pair_insert H htri (edge_mem i) (core_injective.ne (by
-          fin_cases i <;> decide)) (left_mem i) (right_mem i) (hp.left i).left (hp.left i).right.left (hp.left i).right.right;
-        exact h_edge ▸ edge_mem i
-
 theorem cleanEdgeCycle_edge_injective (H : Hypergraph W)
     (c : CleanLoose7EdgeCycle H) : Function.Injective c.edge := by
-      intro i j hij; have := c.core_mem_iff i i; have := c.core_mem_iff j j; simp_all +decide ;
-      grind +suggestions
-
-theorem e5_HK_loose7_of_cleanEdgeCycle
-    (hclean : ∀ {W : Type u} (H : Hypergraph W), H.IsTripleSystem → H.Linear →
-      H.UncountablyChromatic → Nonempty (CleanLoose7EdgeCycle H)) :
-    E5_HK_loose7.{u} := by
-      intro W H htri hlin huc;
-      exact looseCycle7_embeds_of_cleanEdgeCycle H htri (hclean H htri hlin huc).some
-
-
-theorem exists_countable_edge_matching_avoid_countable (H : Hypergraph W)
-    (htri : H.IsTripleSystem) (huc : H.UncountablyChromatic)
-    {S : Set W} (hS : S.Countable) :
-    ∃ es : ℕ → Set W,
-      (∀ i, es i ∈ H.edges ∧ es i ⊆ Sᶜ) ∧
-      (∀ ⦃i j⦄, i ≠ j → Disjoint (es i) (es j)) := by
-        obtain ⟨es, hes⟩ : ∃ es : ℕ → Set W, (∀ i, es i ∈ H.edges ∧ es i ⊆ Sᶜ) ∧ (∀ i j, i < j → Disjoint (es i) (es j)) := by
-          obtain ⟨es, hes⟩ : ∃ es : ℕ → Set W, (∀ i, es i ∈ H.edges ∧ es i ⊆ Sᶜ) ∧ (∀ i, es i ⊆ Sᶜ) ∧ (∀ i j, i < j → Disjoint (es i) (es j)) := by
-            have h_rec : ∀ (S' : Set W), S'.Countable → ∃ e ∈ H.edges, e ⊆ S'ᶜ := by
-              exact fun S' hS' => exists_edge_disjoint_countable H htri huc hS'
-            choose! f hf using h_rec;
-            
-            have h_seq : ∃ S_n : ℕ → Set W, S_n 0 = S ∧ ∀ n, S_n (n + 1) = S_n n ∪ f (S_n n) := by
-              exact ⟨ fun n => Nat.recOn n S fun n ih => ih ∪ f ih, rfl, fun n => rfl ⟩;
-            obtain ⟨S_n, hS_n₀, hS_n⟩ := h_seq
-            have hS_n_countable : ∀ n, (S_n n).Countable := by
-              intro n; induction' n with n ih <;> simp_all +decide [ Set.countable_union ] ;
-              have := htri ( f ( S_n n ) ) ( hf ( S_n n ) ih |>.1 );
-              exact Set.finite_of_ncard_pos ( by linarith ) |> Set.Finite.countable;
-            refine' ⟨ fun n => f ( S_n n ), _, _, _ ⟩ <;> simp_all +decide [ Set.disjoint_left ];
-            · intro n; specialize hf ( S_n n ) ( hS_n_countable n ) ; simp_all +decide [ Set.subset_def ] ;
-              exact fun x hx hx' => hf.2 x hx ( show x ∈ S_n n from by exact Nat.recOn n ( by aesop ) fun n ihn => by aesop );
-            · intro n; specialize hf ( S_n n ) ( hS_n_countable n ) ; simp_all +decide [ Set.subset_def ] ;
-              exact fun x hx hx' => hf.2 x hx ( by exact Nat.recOn n ( by aesop ) fun n ihn => by aesop );
-            · intro i j hij a ha hb; have := hf ( S_n j ) ( hS_n_countable j ) ; simp_all +decide [ Set.subset_def ] ;
-              have h_seq : ∀ n ≥ i + 1, a ∈ S_n n := by
-                intro n hn; induction hn <;> aesop;
-              exact hf ( S_n j ) ( hS_n_countable j ) |>.2 a hb ( h_seq j ( by linarith ) );
-          exact ⟨ es, hes.1, hes.2.2 ⟩;
-        exact ⟨ es, hes.1, fun i j hij => by cases lt_or_gt_of_ne hij <;> [ exact hes.2 _ _ ‹_› ; exact Disjoint.symm ( hes.2 _ _ ‹_› ) ] ⟩
-
-theorem uncountablyChromatic_delete_countable_edges (H : Hypergraph W)
-    (htri : H.IsTripleSystem) (huc : H.UncountablyChromatic)
-    {D : Set (Set W)} (hD : D.Countable) :
-    (⟨H.edges \ D⟩ : Hypergraph W).UncountablyChromatic := by
-      
-      have h_countable_colorable : (⟨H.edges ∩ D⟩ : Hypergraph W).ColorableBy ℵ₀ := by
-        apply Erdos593.colorable_of_countable_edges;
-        · exact fun e he => htri e he.1;
-        · exact hD.mono fun x hx => hx.2;
-      convert uncountablyChromatic_diff H.edges ( H.edges ∩ D ) huc h_countable_colorable using 1;
-      aesop
-
-theorem exists_edge_outside_countable (H : Hypergraph W)
-    (htri : H.IsTripleSystem) (huc : H.UncountablyChromatic)
-    {D : Set (Set W)} (hD : D.Countable) :
-    ∃ e ∈ H.edges, e ∉ D := by
-      by_contra! h;
-      
-      have h_all_edges_in_D : H.edges ⊆ D := by
-        exact h;
-      apply uncountable_edges_of_uncountablyChromatic H htri huc;
-      exact hD.mono h_all_edges_in_D
-
-theorem cleanLoose7EdgeCycle_of_local_intersections (H : Hypergraph W)
-    (core : Fin 7 → W) (edge : Fin 7 → Set W)
-    (hcore : Function.Injective core)
-    (hedge : ∀ i, edge i ∈ H.edges)
-    (hleft : ∀ i, core i ∈ edge i)
-    (hright : ∀ i, core (i + 1) ∈ edge i)
-    (hinter : ∀ ⦃i j : Fin 7⦄, i ≠ j →
-      edge i ∩ edge j ⊆ ({core i, core (i + 1)} : Set W)) :
-    Nonempty (CleanLoose7EdgeCycle H) := by
-  refine' ⟨ ⟨ core, edge, hcore, hedge, hleft, hright, _, _ ⟩ ⟩;
-  · intro i j;
-    by_cases hij : i = j;
-    · aesop;
-    · specialize @hinter i j hij;
-      by_cases h : core j ∈ edge i <;> simp_all +decide [ Set.subset_def ];
-      · cases hinter _ h ( show core j ∈ edge j from hleft _ ) <;> simp_all +decide [ hcore.eq_iff ];
-      · grind;
-  · exact fun i j hij => Set.Subset.trans ( hinter hij ) ( Set.insert_subset_iff.mpr ⟨ Set.mem_range_self _, Set.singleton_subset_iff.mpr ( Set.mem_range_self _ ) ⟩ )
-
-theorem looseCycle7_embeds_of_local_intersections (H : Hypergraph W)
-    (htri : H.IsTripleSystem)
-    (core : Fin 7 → W) (edge : Fin 7 → Set W)
-    (hcore : Function.Injective core)
-    (hedge : ∀ i, edge i ∈ H.edges)
-    (hleft : ∀ i, core i ∈ edge i)
-    (hright : ∀ i, core (i + 1) ∈ edge i)
-    (hinter : ∀ ⦃i j : Fin 7⦄, i ≠ j →
-      edge i ∩ edge j ⊆ ({core i, core (i + 1)} : Set W)) :
-    looseCycle7.Embeds H := by
-  have h_clean_cycle : ∃ c : CleanLoose7EdgeCycle H, True := by
-    exact ⟨ cleanLoose7EdgeCycle_of_local_intersections H core edge hcore hedge hleft hright hinter |> Classical.choice, trivial ⟩;
-  exact looseCycle7_embeds_of_cleanEdgeCycle H htri h_clean_cycle.choose
-
-theorem edge_family_injective_of_pairwise_disjoint
-    {ι : Type*} (es : ι → Set W)
-    (hne : ∀ i, (es i).Nonempty)
-    (hdisj : ∀ ⦃i j⦄, i ≠ j → Disjoint (es i) (es j)) :
-    Function.Injective es := by
-  intro i j hij; specialize hdisj; by_contra hneq; simp_all +decide [ Set.disjoint_left ] ;
-  exact hdisj hneq ( hne i |> Classical.choose_spec ) ( hij ▸ ( hne i |> Classical.choose_spec ) )
-
-theorem exists_countable_injective_edge_matching_avoid_countable
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (huc : H.UncountablyChromatic) {S : Set W} (hS : S.Countable) :
-    ∃ es : ℕ → Set W,
-      Function.Injective es ∧
-      (∀ i, es i ∈ H.edges ∧ es i ⊆ Sᶜ) ∧
-      (∀ ⦃i j⦄, i ≠ j → Disjoint (es i) (es j)) := by
-  convert exists_countable_edge_matching_avoid_countable H htri huc hS using 1;
-  ext;
-  exact ⟨ fun h => ⟨ h.2.1, h.2.2 ⟩, fun h => ⟨ edge_family_injective_of_pairwise_disjoint _ ( fun i => Set.nonempty_of_ncard_ne_zero ( by rw [ htri _ ( h.1 i |>.1 ) ] ; norm_num ) ) h.2, h.1, h.2 ⟩ ⟩
-
-theorem countable_edge_family_vertex_union (H : Hypergraph W)
-    (htri : H.IsTripleSystem) {D : Set (Set W)} (hD : D.Countable)
-    (hsub : D ⊆ H.edges) : (⋃₀ D).Countable := by
-  have h_countable : ∀ e ∈ D, e.Countable := by
-    exact fun e he => Set.Finite.countable <| Set.Finite.subset ( Set.finite_of_ncard_ne_zero <| by have := htri e ( hsub he ) ; aesop ) <| Set.Subset.refl _;
-  exact Set.Countable.sUnion hD h_countable
-
-theorem uncountablyChromatic_avoid_countable_edge_union (H : Hypergraph W)
-    (htri : H.IsTripleSystem) (huc : H.UncountablyChromatic)
-    {D : Set (Set W)} (hD : D.Countable) (hsub : D ⊆ H.edges) :
-    (⟨{e | e ∈ H.edges ∧ e ⊆ (⋃₀ D)ᶜ}⟩ : Hypergraph W).UncountablyChromatic := by
-  convert uncountablyChromatic_avoid_countable H htri huc ( countable_edge_family_vertex_union H htri hD hsub ) using 1
-
-theorem exists_countable_matching_and_uncountable_residual
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (huc : H.UncountablyChromatic) {S : Set W} (hS : S.Countable) :
-    ∃ es : ℕ → Set W,
-      Function.Injective es ∧
-      (∀ i, es i ∈ H.edges ∧ es i ⊆ Sᶜ) ∧
-      (∀ ⦃i j⦄, i ≠ j → Disjoint (es i) (es j)) ∧
-      (⟨{e | e ∈ H.edges ∧ e ⊆ (S ∪ ⋃ i, es i)ᶜ}⟩ : Hypergraph W).UncountablyChromatic := by
-  obtain ⟨es, hes⟩ := exists_countable_injective_edge_matching_avoid_countable H htri huc hS;
-  refine' ⟨ es, hes.1, hes.2.1, hes.2.2, _ ⟩;
-  convert uncountablyChromatic_avoid_countable H htri huc ( hS.union ?_ ) using 1;
-  exact Set.countable_iUnion fun i => Set.Finite.countable ( show Set.Finite ( es i ) from by
-                                                              exact Set.finite_of_ncard_pos ( by rw [ htri _ ( hes.2.1 i |>.1 ) ] ; norm_num ) )
-
-theorem colorableBy_aleph0_of_shadow_fin_coloring (H : Hypergraph W)
-    (htri : H.IsTripleSystem) (k : ℕ) [NeZero k]
-    (c : W → Fin k) (hc : ∀ a b, (shadowGraph H).Adj a b → c a ≠ c b) :
-    H.ColorableBy ℵ₀ := by
-  
-  apply colorableBy_aleph0_of_countable;
-  convert Cardinal.mk_le_aleph0;
-  exact ULift ( Fin k );
-  exact inferInstance;
-  swap;
-  exact fun x => ⟨ c x ⟩;
-  intro e he;
-  obtain ⟨ u, hu, v, hv, huv ⟩ := htri e he |> fun h => Set.ncard_eq_three.mp h;
-  grind +suggestions
-
-theorem exists_finite_shadow_coloring_obstruction (H : Hypergraph W)
-    (htri : H.IsTripleSystem) (huc : H.UncountablyChromatic)
-    (k : ℕ) [NeZero k] :
-    ∃ s : Finset W, ∀ c : W → Fin k,
-      ∃ a ∈ s, ∃ b ∈ s, (shadowGraph H).Adj a b ∧ c a = c b := by
-  by_contra! h;
-  obtain ⟨c, hc⟩ := colorable_of_forall_finite ( shadowGraph H ) k h;
-  exact huc <| colorableBy_aleph0_of_shadow_fin_coloring H htri k c hc
-
-
-theorem isClosed_edgeProperColorings (k : ℕ) (e : Set W) (he : e.Finite) :
-    IsClosed {c : W → Fin k |
-      ∃ u ∈ e, ∃ v ∈ e, u ≠ v ∧ c u ≠ c v} := by
-  convert isClosed_biUnion_finset ( s := ( he.toFinset : Finset W ) ) ( fun u hu => isClosed_biUnion_finset ( s := ( he.toFinset : Finset W ) ) ( fun v hv => ?_ ) ) using 1;
-  rotate_left;
-  use fun u v => { c : W → Fin k | c u ≠ c v };
-  · exact isClosed_compl_iff.mpr ( isOpen_discrete { x : Fin k × Fin k | x.1 = x.2 } |> IsOpen.preimage ( show Continuous fun c : W → Fin k => ( c u, c v ) from Continuous.prodMk ( continuous_apply _ ) ( continuous_apply _ ) ) );
-  · ext; aesop
-
-theorem hypergraph_coloring_compactness (H : Hypergraph W)
-    (htri : H.IsTripleSystem) (k : ℕ) [NeZero k]
-    (hfin : ∀ D : Finset (Set W), (∀ e ∈ D, e ∈ H.edges) →
-      ∃ c : W → Fin k, (⟨(D : Set (Set W))⟩ : Hypergraph W).ProperColoring c) :
-    ∃ c : W → Fin k, H.ProperColoring c := by
-  classical
-  let T : H.edges → Set (W → Fin k) := fun e =>
-    {c | ∃ u ∈ e.1, ∃ v ∈ e.1, c u ≠ c v}
-  have hclosed : ∀ e, IsClosed (T e) := by
-    intro e
-    have hfin_e : e.1.Finite :=
-      Set.finite_of_ncard_pos (by rw [htri e.1 e.2]; norm_num)
-    convert isClosed_edgeProperColorings k e.1 hfin_e using 1
-    ext c
-    constructor
-    · rintro ⟨u, hu, v, hv, huv⟩
-      exact ⟨u, hu, v, hv, fun h => huv (congrArg c h), huv⟩
-    · rintro ⟨u, hu, v, hv, huv, hcolor⟩
-      exact ⟨u, hu, v, hv, hcolor⟩
-  have hfinite : ∀ D : Finset H.edges,
-      ((Set.univ : Set (W → Fin k)) ∩ ⋂ e ∈ D, T e).Nonempty := by
-    intro D
-    let E : Finset (Set W) := D.image Subtype.val
-    have hE : ∀ e ∈ E, e ∈ H.edges := by
-      intro e he
-      simp only [E, Finset.mem_image] at he
-      obtain ⟨d, hd, rfl⟩ := he
-      exact d.2
-    obtain ⟨c, hc⟩ := hfin E hE
-    refine ⟨c, ⟨Set.mem_univ c, ?_⟩⟩
-    simp only [Set.mem_iInter]
-    intro e heD
-    have heE : e.1 ∈ E := Finset.mem_image_of_mem Subtype.val heD
-    show ∃ u ∈ e.1, ∃ v ∈ e.1, c u ≠ c v
-    exact hc e.1 heE
-  obtain ⟨c, hcuniv, hc⟩ := isCompact_univ.inter_iInter_nonempty T hclosed hfinite
-  refine ⟨c, ?_⟩
-  intro e he
-  have hce : c ∈ T ⟨e, he⟩ := Set.mem_iInter.mp hc ⟨e, he⟩
-  exact hce
-
-theorem exists_finite_edge_coloring_obstruction (H : Hypergraph W)
-    (htri : H.IsTripleSystem) (huc : H.UncountablyChromatic)
-    (k : ℕ) [NeZero k] :
-    ∃ D : Finset (Set W),
-      (∀ e ∈ D, e ∈ H.edges) ∧
-      ¬ ∃ c : W → Fin k, (⟨(D : Set (Set W))⟩ : Hypergraph W).ProperColoring c := by
-  contrapose! huc;
-  obtain ⟨c, hc⟩ := hypergraph_coloring_compactness H htri k huc;
-  refine' fun h => h _;
-  convert colorableBy_aleph0_of_countable H _ _;
-  exact ULift ( Fin k );
-  exact Cardinal.mk_le_aleph0;
-  exact fun x => ⟨ c x ⟩;
-  intro e he; specialize hc e he; aesop;
-
-
-theorem exists_finite_edge_coloring_obstruction_avoid_countable
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (huc : H.UncountablyChromatic) {S : Set W} (hS : S.Countable)
-    (k : ℕ) [NeZero k] :
-    ∃ D : Finset (Set W),
-      (∀ e ∈ D, e ∈ H.edges ∧ e ⊆ Sᶜ) ∧
-      ¬ ∃ c : W → Fin k, (⟨(D : Set (Set W))⟩ : Hypergraph W).ProperColoring c := by
-  convert exists_finite_edge_coloring_obstruction ( ⟨ { e | e ∈ H.edges ∧ e ⊆ Sᶜ } ⟩ : Hypergraph W ) ?_ ?_ k;
-  · intro e he;
-    exact htri e he.1;
-  · convert uncountablyChromatic_avoid_countable H htri huc hS using 1
-
-theorem exists_finite_edge_coloring_obstruction_avoid_countable_edges
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (huc : H.UncountablyChromatic) {A : Set (Set W)} (hA : A.Countable)
-    (k : ℕ) [NeZero k] :
-    ∃ D : Finset (Set W),
-      (∀ e ∈ D, e ∈ H.edges ∧ e ∉ A) ∧
-      ¬ ∃ c : W → Fin k, (⟨(D : Set (Set W))⟩ : Hypergraph W).ProperColoring c := by
-  have hres : (⟨H.edges \ A⟩ : Hypergraph W).UncountablyChromatic :=
-    uncountablyChromatic_delete_countable_edges H htri huc hA
-  exact exists_finite_edge_coloring_obstruction
-    (⟨H.edges \ A⟩ : Hypergraph W) (fun e he => htri e he.1) hres k
+  intro i j hij
+  have hl := (c.core_mem_iff j i).mp (hij ▸ c.left_mem i)
+  have hr := (c.core_mem_iff j (i + 1)).mp (hij ▸ c.right_mem i)
+  rcases hl with h | h
+  · exact h
+  · subst i
+    fin_cases j <;> simp at hr
 
 end Erdos593
 end
@@ -9070,157 +8605,6 @@ universe u
 variable {W : Type u}
 
 def finiteEdgeSupport (D : Finset (Set W)) : Set W := ⋃ e ∈ D, e
-
-theorem finite_finiteEdgeSupport (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (D : Finset (Set W)) (hD : ∀ e ∈ D, e ∈ H.edges) :
-    (finiteEdgeSupport D).Finite := by
-      have h_finite_edges : ∀ e ∈ D, Set.Finite e := by
-        exact fun e he => Set.finite_of_ncard_ne_zero ( by rw [ htri e ( hD e he ) ] ; norm_num )
-      exact Set.Finite.biUnion ( Finset.finite_toSet D ) h_finite_edges
-
-theorem countable_finiteEdgeSupport (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (D : Finset (Set W)) (hD : ∀ e ∈ D, e ∈ H.edges) :
-    (finiteEdgeSupport D).Countable := by
-      exact Set.Finite.countable ( finite_finiteEdgeSupport H htri D hD )
-
-theorem exists_supported_finite_obstruction_avoid_countable
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (huc : H.UncountablyChromatic) {S : Set W} (hS : S.Countable)
-    (k : ℕ) [NeZero k] :
-    ∃ D : Finset (Set W), ∃ V : Finset W,
-      (∀ e ∈ D, e ∈ H.edges ∧ e ⊆ (V : Set W)) ∧
-      (∀ x ∈ V, x ∉ S) ∧
-      ¬ ∃ c : W → Fin k,
-        (⟨(D : Set (Set W))⟩ : Hypergraph W).ProperColoring c := by
-          convert exists_finite_edge_coloring_obstruction_avoid_countable H htri huc hS k using 1;
-          ext D;
-          constructor <;> intro h;
-          · grind;
-          · use Set.Finite.toFinset (finite_finiteEdgeSupport H htri D (fun e he => h.left e he |>.1));
-            simp_all +decide [ Set.subset_def ];
-            exact ⟨ fun e he x hx => Set.mem_iUnion₂.2 ⟨ e, he, hx ⟩, fun x hx => by rcases Set.mem_iUnion₂.1 hx with ⟨ e, he, hx ⟩ ; exact h.1 e he |>.2 hx ⟩
-
-theorem exists_disjoint_finite_obstruction_sequence
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (huc : H.UncountablyChromatic) {S : Set W} (hS : S.Countable) :
-    ∃ D : ℕ → Finset (Set W),
-      (∀ n e, e ∈ D n → e ∈ H.edges ∧ e ⊆ Sᶜ) ∧
-      (∀ ⦃m n⦄, m ≠ n →
-        Disjoint (finiteEdgeSupport (D m)) (finiteEdgeSupport (D n))) ∧
-      (∀ n, ¬ ∃ c : W → Fin (n + 1),
-        (⟨(D n : Set (Set W))⟩ : Hypergraph W).ProperColoring c) := by
-
-          have h_seq : ∃ (E : ℕ → Finset W) (D : ℕ → Finset (Set W)),
-            (∀ n, (∀ e ∈ D n, e ∈ H.edges ∧ e ⊆ (E n : Set W))) ∧
-            (∀ n, (∀ x ∈ E n, x ∉ S) ∧ (∀ m < n, Disjoint (E m : Set W) (E n : Set W))) ∧
-            (∀ n, ¬∃ c : W → Fin (n + 1), (⟨(D n : Set (Set W))⟩ : Hypergraph W).ProperColoring c) := by
-              have h_seq : ∀ (n : ℕ) (U : Set W) (hU : U.Countable), ∃ (E : Finset W) (D : Finset (Set W)),
-                (∀ e ∈ D, e ∈ H.edges ∧ e ⊆ (E : Set W)) ∧
-                (∀ x ∈ E, x ∉ S) ∧
-                Disjoint (E : Set W) U ∧
-                ¬∃ c : W → Fin (n + 1), (⟨(D : Set (Set W))⟩ : Hypergraph W).ProperColoring c := by
-                  intro n U hU
-                  obtain ⟨D, V, hD, hV, hob⟩ := exists_supported_finite_obstruction_avoid_countable H htri huc (hS.union hU) (n + 1);
-                  exact ⟨ V, D, hD, fun x hx => by specialize hV x hx; aesop, Set.disjoint_left.mpr fun x hxV hxU => by specialize hV x hxV; aesop, hob ⟩;
-              choose! E D hED using h_seq;
-              
-              obtain ⟨U, hU⟩ : ∃ U : ℕ → Set W, (∀ n, (U n).Countable) ∧ (∀ n, U (n + 1) = U n ∪ (E n (U n) : Set W)) ∧ U 0 = ∅ := by
-                refine' ⟨ fun n => Nat.recOn n ∅ fun n ih => ih ∪ ( E n ih : Set W ), _, _, _ ⟩ <;> simp +decide;
-                intro n; induction n <;> simp_all +decide [ Set.countable_empty, Set.countable_union ] ;
-                exact Set.to_countable _;
-              refine' ⟨ fun n => E n ( U n ), fun n => D n ( U n ), _, _, _ ⟩ <;> simp_all +decide [ Set.disjoint_left ];
-              · exact fun n e he => hED n ( U n ) ( hU.1 n ) |>.1 e he |>.1;
-              · refine' fun n => ⟨ hED n ( U n ) ( hU.1 n ) |>.2.1, fun m mn => _ ⟩;
-                intro x hx₁ hx₂; have := hED n ( U n ) ( hU.1 n ) |>.2.2.1 hx₂; simp_all +decide [ Set.subset_def ] ;
-                exact this ( by exact Nat.le_induction ( by aesop ) ( fun k hk ih => by aesop ) n mn );
-          obtain ⟨ E, D, hE, hD, hD' ⟩ := h_seq;
-          refine' ⟨ D, _, _, hD' ⟩;
-          · exact fun n e he => ⟨ hE n e he |>.1, fun x hx => hD n |>.1 x ( hE n e he |>.2 hx ) ⟩;
-          · intro m n mn; cases lt_or_gt_of_ne mn <;> simp_all +decide [ Set.disjoint_left ] ;
-            · simp_all +decide [ finiteEdgeSupport ];
-              exact fun a e he ha f hf => fun ha' => hD n |>.2 m ‹_› ( hE m e he |>.2 ha ) ( hE n f hf |>.2 ha' );
-            · simp_all +decide [ finiteEdgeSupport ];
-              intro a x hx hx' y hy hy'; have := hE m x hx; have := hE n y hy; simp_all +decide [ Set.subset_def ] ;
-              exact hD m |>.2 n ‹_› ( this.2 a hy' ) ( ‹x ∈ H.edges ∧ ∀ x_1 ∈ x, x_1 ∈ E m›.2 a hx' )
-
-theorem exists_countable_edge_subhypergraph_unbounded_finite_chromatic
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (huc : H.UncountablyChromatic) {S : Set W} (hS : S.Countable) :
-    ∃ A : Set (Set W),
-      A.Countable ∧ A ⊆ H.edges ∧ (∀ e ∈ A, e ⊆ Sᶜ) ∧
-      ∀ k : ℕ, 0 < k →
-        ¬ ∃ c : W → Fin k, (⟨A⟩ : Hypergraph W).ProperColoring c := by
-          obtain ⟨D, hD⟩ := exists_disjoint_finite_obstruction_sequence H htri huc hS;
-          refine' ⟨ ⋃ n, D n, Set.countable_iUnion fun n => Finset.countable_toSet _, _, _, _ ⟩ <;> simp_all +decide [ Set.subset_def ];
-          · exact fun e n he => hD.1 n e he |>.1;
-          · exact fun e n he x hx => hD.1 n e he |>.2 x hx;
-          · intro k hk x hx; specialize hD; have := hD.2.2 ( k - 1 ) ( fun w => Fin.castLE ( by omega ) ( x w ) ) ; simp_all +decide [ Hypergraph.ProperColoring ] ;
-            grind
-
-theorem exists_disjoint_finite_obstruction_sequence_avoid_edges
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (huc : H.UncountablyChromatic) {S : Set W} (hS : S.Countable)
-    {B : Set (Set W)} (hB : B.Countable) :
-    ∃ D : ℕ → Finset (Set W),
-      (∀ n e, e ∈ D n → e ∈ H.edges ∧ e ∉ B ∧ e ⊆ Sᶜ) ∧
-      (∀ ⦃m n⦄, m ≠ n →
-        Disjoint (finiteEdgeSupport (D m)) (finiteEdgeSupport (D n))) ∧
-      (∀ n, ¬ ∃ c : W → Fin (n + 1),
-        (⟨(D n : Set (Set W))⟩ : Hypergraph W).ProperColoring c) := by
-          obtain ⟨D, hD⟩ := exists_disjoint_finite_obstruction_sequence (⟨{e | e ∈ H.edges ∧ e ∉ B}⟩ : Hypergraph W) (by
-          exact fun e he => htri e he.1) (by
-          apply uncountablyChromatic_delete_countable_edges H htri huc hB) hS;
-          exact ⟨ D, fun n e he => ⟨ hD.1 n e he |>.1.1, hD.1 n e he |>.1.2, hD.1 n e he |>.2 ⟩, hD.2.1, hD.2.2 ⟩
-
-theorem exists_countable_supported_unbounded_chromatic_avoid
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (huc : H.UncountablyChromatic) {S : Set W} (hS : S.Countable)
-    {B : Set (Set W)} (hB : B.Countable) :
-    ∃ A : Set (Set W), ∃ V : Set W,
-      A.Countable ∧ V.Countable ∧ A ⊆ H.edges ∧
-      (∀ e ∈ A, e ∉ B ∧ e ⊆ V) ∧ V ⊆ Sᶜ ∧
-      ∀ k : ℕ, 0 < k →
-        ¬ ∃ c : W → Fin k, (⟨A⟩ : Hypergraph W).ProperColoring c := by
-          obtain ⟨ D, hD₁, hD₂, hD₃ ⟩ := exists_disjoint_finite_obstruction_sequence_avoid_edges H htri huc hS hB;
-          refine' ⟨ ⋃ n, D n, ⋃ n, finiteEdgeSupport ( D n ), _, _, _, _, _ ⟩ <;> simp_all +decide [ Set.subset_def ];
-          · exact fun n => Set.to_countable _;
-          · exact fun n => countable_finiteEdgeSupport H htri ( D n ) fun e he => hD₁ n e he |>.1;
-          · exact fun e n he => hD₁ n e he |>.1;
-          · exact fun e n he => ⟨ hD₁ n e he |>.2.1, fun x hx => ⟨ n, Set.mem_iUnion₂.2 ⟨ e, he, hx ⟩ ⟩ ⟩;
-          · refine' ⟨ _, _ ⟩;
-            · intro x n hx; obtain ⟨ e, he, hx ⟩ := Set.mem_iUnion₂.mp hx; specialize hD₁ n e he; aesop;
-            · intro k hk x hx; specialize hD₃ ( k - 1 ) ( fun w => Fin.castLE ( by omega ) ( x w ) ) ; simp_all +decide [ Hypergraph.ProperColoring ] ;
-              grind
-
-theorem exists_exactly_countably_chromatic_subhypergraph_avoid
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (huc : H.UncountablyChromatic) {S : Set W} (hS : S.Countable)
-    {B : Set (Set W)} (hB : B.Countable) :
-    ∃ A : Set (Set W),
-      A.Countable ∧ A ⊆ H.edges ∧ (∀ e ∈ A, e ∉ B ∧ e ⊆ Sᶜ) ∧
-      (⟨A⟩ : Hypergraph W).ColorableBy ℵ₀ ∧
-      ∀ k : ℕ, 0 < k →
-        ¬ ∃ c : W → Fin k, (⟨A⟩ : Hypergraph W).ProperColoring c := by
-          obtain ⟨ A, V, hA, hV, hA_sub, hA_prop, hV_sub, hA_unbounded ⟩ := exists_countable_supported_unbounded_chromatic_avoid H htri huc hS hB;
-          refine' ⟨ A, hA, hA_sub, fun e he => ⟨ hA_prop e he |>.1, hA_prop e he |>.2.trans hV_sub ⟩, _, hA_unbounded ⟩;
-          convert colorable_of_countable_edges ⟨ A ⟩ _ hA using 1;
-          exact fun e he => htri e ( hA_sub he )
-
-theorem exists_linear_exactly_countably_chromatic_subhypergraph_avoid
-    (H : Hypergraph W) (htri : H.IsTripleSystem) (hlin : H.Linear)
-    (huc : H.UncountablyChromatic) {S : Set W} (hS : S.Countable)
-    {B : Set (Set W)} (hB : B.Countable) :
-    ∃ A : Set (Set W),
-      A.Countable ∧ A ⊆ H.edges ∧ (∀ e ∈ A, e ∉ B ∧ e ⊆ Sᶜ) ∧
-      (⟨A⟩ : Hypergraph W).IsTripleSystem ∧
-      (⟨A⟩ : Hypergraph W).Linear ∧
-      (⟨A⟩ : Hypergraph W).ColorableBy ℵ₀ ∧
-      ∀ k : ℕ, 0 < k →
-        ¬ ∃ c : W → Fin k, (⟨A⟩ : Hypergraph W).ProperColoring c := by
-          obtain ⟨ A, hA₁, hA₂, hA₃, hA₄, hA₅ ⟩ := exists_exactly_countably_chromatic_subhypergraph_avoid H htri huc hS hB;
-          refine' ⟨ A, hA₁, hA₂, hA₃, _, _, hA₄, hA₅ ⟩;
-          · exact fun e he => htri e ( hA₂ he );
-          · exact fun e₁ he₁ e₂ he₂ hne => hlin e₁ ( hA₂ he₁ ) e₂ ( hA₂ he₂ ) hne
 
 end Erdos593
 end
@@ -9378,29 +8762,6 @@ noncomputable def CleanLoose7EdgeCycle.toInduced
     have hj := (c.core_mem_iff j k).mp hxj
     fin_cases i <;> fin_cases j <;> fin_cases k <;> simp_all
 
-theorem nonempty_cleanLoose7_iff_inducedEdgeIntersectionSeven
-    (H : Hypergraph W) (hlin : H.Linear) :
-    Nonempty (CleanLoose7EdgeCycle H) ↔
-      Nonempty (InducedEdgeIntersectionSevenCycle H) := by
-  constructor
-  · rintro ⟨c⟩
-    exact ⟨c.toInduced H⟩
-  · rintro ⟨c⟩
-    exact ⟨c.toClean H hlin⟩
-
-theorem looseCycle7_embeds_of_induced_edgeIntersection_cycle
-    (H : Hypergraph W) (htri : H.IsTripleSystem) (hlin : H.Linear)
-    (c : InducedEdgeIntersectionSevenCycle H) :
-    looseCycle7.Embeds H := by
-  exact looseCycle7_embeds_of_cleanEdgeCycle H htri ( c.toClean H hlin )
-
-theorem e5_HK_loose7_of_induced_edgeIntersection_cycle
-    (hcycle : ∀ {W : Type u} (H : Hypergraph W), H.IsTripleSystem → H.Linear →
-      H.UncountablyChromatic → Nonempty (InducedEdgeIntersectionSevenCycle H)) :
-    E5_HK_loose7.{u} := by
-  intro W H htri hlin huc;
-  exact looseCycle7_embeds_of_induced_edgeIntersection_cycle H htri hlin ( Classical.choice ( hcycle H htri hlin huc ) )
-
 end Erdos593
 end
 
@@ -9424,104 +8785,6 @@ theorem existsUnique_common_vertex (H : Hypergraph W) (hlin : H.Linear)
   obtain ⟨ x, hx ⟩ := hmeet;
   exact ⟨ x, hx, fun y hy => by have := linear_intersection_subsingleton H hlin he hf hef; exact this hy hx ⟩
 
-theorem neighbour_meets_one_of_three (H : Hypergraph W)
-    (htri : H.IsTripleSystem) {e f : Set W} (he : e ∈ H.edges)
-    (hmeet : (e ∩ f).Nonempty) :
-    ∃ a b c, a ≠ b ∧ a ≠ c ∧ b ≠ c ∧ e = {a, b, c} ∧
-      (a ∈ f ∨ b ∈ f ∨ c ∈ f) := by
-  have := htri e he;
-  obtain ⟨ a, b, c, h ⟩ := Set.ncard_eq_three.mp this;
-  exact ⟨ a, b, c, h.1, h.2.1, h.2.2.1, h.2.2.2, by obtain ⟨ x, hx ⟩ := hmeet; aesop ⟩
-
-theorem card_pairwiseDisjoint_edges_meeting_le_three
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (e : Set W) (he : e ∈ H.edges) (D : Finset (Set W))
-    (hDmeet : ∀ f ∈ D, (e ∩ f).Nonempty)
-    (hDdisj : ∀ ⦃f g⦄, f ∈ D → g ∈ D → f ≠ g → Disjoint f g) :
-    D.card ≤ 3 := by
-  have h_card : ∀ f ∈ D, (e ∩ f).Nonempty → ∃ x, x ∈ e ∧ x ∈ f := by
-    exact fun f hf h => by obtain ⟨ x, hx ⟩ := h; exact ⟨ x, hx.1, hx.2 ⟩ ;
-  choose! x hx₁ hx₂ using h_card;
-  have h_inj : Function.Injective (fun f : { f : Set W // f ∈ D } => ⟨x f.1 f.2 (hDmeet f.1 f.2), hx₁ f.1 f.2 (hDmeet f.1 f.2)⟩ : { f : Set W // f ∈ D } → { w : W // w ∈ e }) := by
-    intro f g hfg; simp_all +decide [ Set.disjoint_left ] ;
-    grind +splitImp;
-  have h_card : (Set.ncard e) ≥ D.card := by
-    have h_card : (Set.ncard (Set.image (fun f : { f : Set W // f ∈ D } => x f.1 f.2 (hDmeet f.1 f.2)) Set.univ)) ≤ (Set.ncard e) := by
-      apply Set.ncard_le_ncard;
-      · exact Set.image_subset_iff.mpr fun f _ => hx₁ _ _ _;
-      · exact Set.finite_of_ncard_pos ( by rw [ htri e he ] ; norm_num );
-    rw [ Set.InjOn.ncard_image ] at h_card;
-    · simpa [ Set.ncard_univ ] using h_card;
-    · exact fun f _ g _ hfg => by have := @h_inj f g; aesop;
-  exact h_card.trans ( htri e he ▸ le_rfl )
-
-theorem no_four_pairwise_disjoint_edges_meeting
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (e : Set W) (he : e ∈ H.edges)
-    (f : Fin 4 → Set W)
-    (hmeet : ∀ i, (e ∩ f i).Nonempty)
-    (hdisj : ∀ ⦃i j⦄, i ≠ j → Disjoint (f i) (f j)) : False := by
-  contrapose! htri;
-  intro h;
-  obtain ⟨a, b, c, habc⟩ : ∃ a b c, a ≠ b ∧ a ≠ c ∧ b ≠ c ∧ e = {a, b, c} := by
-    have := h e he; simp_all +decide;
-    rw [ Set.ncard_eq_three ] at this; tauto;
-  simp_all +decide [ Set.Nonempty ];
-  simp_all +decide [ Fin.forall_fin_succ, Set.disjoint_left ];
-  grind
-
-theorem edgeIntersectionGraph_no_four_claw
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (center : H.edges) (leaf : Fin 4 → H.edges)
-    (hleaf : Function.Injective leaf)
-    (hadj : ∀ i, (edgeIntersectionGraph H).Adj center (leaf i))
-    (hnadj : ∀ ⦃i j⦄, i ≠ j →
-      ¬ (edgeIntersectionGraph H).Adj (leaf i) (leaf j)) : False := by
-  apply no_four_pairwise_disjoint_edges_meeting H htri center.val center.property (fun i => (leaf i).val) (fun i => ?_) (fun i j hij => ?_);
-  · exact ( edgeIntersectionGraph_adj_iff H center ( leaf i ) ).mp ( hadj i ) |>.2;
-  · simp_all +decide [ Set.disjoint_iff_inter_eq_empty, edgeIntersectionGraph_adj_iff ];
-    exact Set.not_nonempty_iff_eq_empty.mp ( hnadj hij ( hleaf.ne hij ) )
-
-theorem edgeIntersectionGraph_adj_of_common_vertex
-    (H : Hypergraph W) {e f : H.edges} (hef : e ≠ f)
-    {x : W} (hxe : x ∈ e.1) (hxf : x ∈ f.1) :
-    (edgeIntersectionGraph H).Adj e f := by
-  constructor <;> tauto
-
-theorem edgeIntersectionGraph_neighbour_star_cover
-    (H : Hypergraph W) (center leaf : H.edges)
-    (hadj : (edgeIntersectionGraph H).Adj center leaf) :
-    ∃ x ∈ center.1, x ∈ leaf.1 := by
-  obtain ⟨ x, hx ⟩ := hadj;
-  exact hx.elim ( fun h => h.imp fun x hx => ⟨ hx.1, hx.2 ⟩ ) fun h => h.imp fun x hx => ⟨ hx.2, hx.1 ⟩
-
-theorem edgeIntersectionGraph_independent_neighbour_card_le_three
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (center : H.edges) (D : Finset H.edges)
-    (hadj : ∀ f ∈ D, (edgeIntersectionGraph H).Adj center f)
-    (hind : ∀ ⦃f g⦄, f ∈ D → g ∈ D → f ≠ g →
-      ¬ (edgeIntersectionGraph H).Adj f g) :
-    D.card ≤ 3 := by
-  convert card_pairwiseDisjoint_edges_meeting_le_three H htri center.1 center.2 ( D.image Subtype.val ) ?_ using 1;
-  all_goals try exact Classical.decEq _;
-  · simp +decide [ Finset.card_image_of_injective, Function.Injective ];
-    contrapose! hind;
-    obtain ⟨ f, g, hf, hf', hg, hg', hfg, h ⟩ := hind.1;
-    exact ⟨ _, _, hf', hg', by aesop, by rw [ edgeIntersectionGraph_adj_iff ] ; exact ⟨ by aesop, by rw [ Set.not_disjoint_iff ] at h; tauto ⟩ ⟩;
-  · intro f hf
-    simp only [Finset.mem_image] at hf
-    obtain ⟨g, hg, rfl⟩ := hf
-    exact ((edgeIntersectionGraph_adj_iff H center g).mp (hadj g hg)).2
-
-theorem edgeIntersectionGraph_no_independent_four_neighbours
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (center : H.edges) (leaf : Fin 4 → H.edges)
-    (hleaf : Function.Injective leaf)
-    (hadj : ∀ i, (edgeIntersectionGraph H).Adj center (leaf i)) :
-    ∃ i j, i ≠ j ∧ (edgeIntersectionGraph H).Adj (leaf i) (leaf j) := by
-  have := @Erdos593.edgeIntersectionGraph_no_four_claw W H htri center leaf hleaf hadj;
-  grind
-
 end Erdos593
 end
 
@@ -9536,126 +8799,19 @@ variable {W : Type u}
 def edgeStar (H : Hypergraph W) (x : W) : Set H.edges :=
   {e | x ∈ e.1}
 
-theorem mem_edgeStar_iff (H : Hypergraph W) (x : W) (e : H.edges) :
-    e ∈ edgeStar H x ↔ x ∈ e.1 := by
-  rfl
-
-theorem edgeStar_pairwise_adjacent (H : Hypergraph W) (x : W)
-    {e f : H.edges} (he : e ∈ edgeStar H x) (hf : f ∈ edgeStar H x)
-    (hef : e ≠ f) :
-    (edgeIntersectionGraph H).Adj e f := by
-  exact Erdos593.edgeIntersectionGraph_adj_of_common_vertex H hef ( by simpa using he ) ( by simpa using hf )
-
 theorem unique_contact_vertex (H : Hypergraph W) (hlin : H.Linear)
     {e f : H.edges} (hadj : (edgeIntersectionGraph H).Adj e f) :
     ∃! x, x ∈ e.1 ∧ x ∈ f.1 := by
-  convert existsUnique_common_vertex H hlin e.property f.property _ _ using 1;
-  · exact fun h => hadj.1 ( Subtype.ext h );
-  · convert hadj.2 using 1;
-    grind +qlia
+  exact existsUnique_common_vertex H hlin e.property f.property
+    (fun h => hadj.1 (Subtype.ext h))
+    (hadj.2.elim id (fun h => by simpa only [Set.inter_comm] using h))
 
 noncomputable def contactVertex (H : Hypergraph W) (hlin : H.Linear)
     {e f : H.edges} (hadj : (edgeIntersectionGraph H).Adj e f) : W :=
   Classical.choose (unique_contact_vertex H hlin hadj)
 
-theorem contactVertex_mem (H : Hypergraph W) (hlin : H.Linear)
-    {e f : H.edges} (hadj : (edgeIntersectionGraph H).Adj e f) :
-    contactVertex H hlin hadj ∈ e.1 ∧ contactVertex H hlin hadj ∈ f.1 := by
-  have := Classical.choose_spec ( unique_contact_vertex H hlin hadj );
-  exact this.1
-
-theorem eq_contactVertex_of_mem (H : Hypergraph W) (hlin : H.Linear)
-    {e f : H.edges} (hadj : (edgeIntersectionGraph H).Adj e f)
-    {x : W} (hxe : x ∈ e.1) (hxf : x ∈ f.1) :
-    x = contactVertex H hlin hadj := by
-  exact ExistsUnique.unique ( unique_contact_vertex H hlin hadj ) ⟨ hxe, hxf ⟩ ( contactVertex_mem H hlin hadj )
-
-theorem neighbourhood_subset_iUnion_edgeStar (H : Hypergraph W)
-    (center : H.edges) :
-    {f | (edgeIntersectionGraph H).Adj center f} ⊆
-      ⋃ x ∈ center.1, edgeStar H x := by
-  intro f hf; simp_all +decide [ Set.mem_iUnion ] ;
-  exact Exists.elim ( edgeIntersectionGraph_neighbour_star_cover H center f hf ) fun x hx => ⟨ x, hx.1, by unfold edgeStar; aesop ⟩
-
-theorem neighbour_unique_edgeStar (H : Hypergraph W) (hlin : H.Linear)
-    (center leaf : H.edges)
-    (hadj : (edgeIntersectionGraph H).Adj center leaf) :
-    ∃! x, x ∈ center.1 ∧ leaf ∈ edgeStar H x := by
-  convert unique_contact_vertex H hlin hadj using 1
-
-theorem neighbours_adjacent_of_contact_eq
-    (H : Hypergraph W) (hlin : H.Linear) (center : H.edges)
-    {e f : H.edges}
-    (he : (edgeIntersectionGraph H).Adj center e)
-    (hf : (edgeIntersectionGraph H).Adj center f)
-    (hef : e ≠ f)
-    (hcontact : contactVertex H hlin he = contactVertex H hlin hf) :
-    (edgeIntersectionGraph H).Adj e f := by
-  by_contra h_contra;
-  obtain ⟨x, hx⟩ : ∃ x, x ∈ e.1 ∧ x ∈ f.1 := by
-    exact ⟨ contactVertex H hlin he, contactVertex_mem H hlin he |>.2, hcontact.symm ▸ contactVertex_mem H hlin hf |>.2 ⟩;
-  exact h_contra ( edgeIntersectionGraph_adj_of_common_vertex H hef hx.1 hx.2 )
-
-theorem contactVertex_injective_on_independent_neighbours
-    (H : Hypergraph W) (hlin : H.Linear) (center : H.edges)
-    {ι : Type*} {leaf : ι → H.edges}
-    (hleaf : Function.Injective leaf)
-    (hadj : ∀ i, (edgeIntersectionGraph H).Adj center (leaf i))
-    (hind : ∀ ⦃i j⦄, i ≠ j →
-      ¬ (edgeIntersectionGraph H).Adj (leaf i) (leaf j)) :
-    Function.Injective (fun i => contactVertex H hlin (hadj i)) := by
-  intro i j hij;
-  exact Classical.not_not.1 fun hi => hind hi <| by simpa [ hij ] using neighbours_adjacent_of_contact_eq H hlin center ( hadj i ) ( hadj j ) ( hleaf.ne hi ) hij;
-
-theorem neighbour_not_mem_two_center_stars
-    (H : Hypergraph W) (hlin : H.Linear) (center leaf : H.edges)
-    (hadj : (edgeIntersectionGraph H).Adj center leaf)
-    {x y : W} (hxc : x ∈ center.1) (hyc : y ∈ center.1) (hxy : x ≠ y)
-    (hxl : leaf ∈ edgeStar H x) :
-    leaf ∉ edgeStar H y := by
-  contrapose! hxy; have := unique_contact_vertex H hlin hadj; simp_all +decide [ mem_edgeStar_iff ] ;
-  exact this.unique ⟨ hxc, hxl ⟩ ⟨ hyc, hxy ⟩
-
-theorem independent_neighbours_inject_into_center
-    (H : Hypergraph W) (hlin : H.Linear) (center : H.edges)
-    {ι : Type*} {leaf : ι → H.edges}
-    (hleaf : Function.Injective leaf)
-    (hadj : ∀ i, (edgeIntersectionGraph H).Adj center (leaf i))
-    (hind : ∀ ⦃i j⦄, i ≠ j →
-      ¬ (edgeIntersectionGraph H).Adj (leaf i) (leaf j)) :
-    ∃ contact : ι → {x // x ∈ center.1}, Function.Injective contact := by
-  have h_inj : Function.Injective (fun i => contactVertex H hlin (hadj i)) :=
-    contactVertex_injective_on_independent_neighbours H hlin center hleaf hadj hind
-  exact ⟨ fun i => ⟨ _, contactVertex_mem H hlin ( hadj i ) |>.1 ⟩, fun i j hij => h_inj <| Subtype.ext_iff.mp hij ⟩
-
-
 def neighbourStar (H : Hypergraph W) (center : H.edges) (x : W) : Set H.edges :=
   {leaf | (edgeIntersectionGraph H).Adj center leaf ∧ leaf ∈ edgeStar H x}
-
-theorem neighbourhood_eq_iUnion_neighbourStar (H : Hypergraph W)
-    (center : H.edges) :
-    {leaf | (edgeIntersectionGraph H).Adj center leaf} =
-      ⋃ x ∈ center.1, neighbourStar H center x := by
-  ext leaf
-  simp [neighbourStar];
-  exact fun h => by obtain ⟨ x, hx ⟩ := edgeIntersectionGraph_neighbour_star_cover H center leaf h; exact ⟨ x, hx.1, hx.2 ⟩ ;
-
-theorem disjoint_neighbourStar (H : Hypergraph W) (hlin : H.Linear)
-    (center : H.edges) {x y : W} (hxc : x ∈ center.1) (hyc : y ∈ center.1)
-    (hxy : x ≠ y) :
-    Disjoint (neighbourStar H center x) (neighbourStar H center y) := by
-  exact Set.disjoint_left.mpr fun leaf hleafx hleafy => Erdos593.neighbour_not_mem_two_center_stars H hlin center leaf ( hleafx.1 ) hxc hyc hxy hleafx.2 hleafy.2
-
-theorem neighbourStar_pairwise_adjacent (H : Hypergraph W)
-    (center : H.edges) (x : W) {e f : H.edges}
-    (he : e ∈ neighbourStar H center x)
-    (hf : f ∈ neighbourStar H center x) (hef : e ≠ f) :
-    (edgeIntersectionGraph H).Adj e f := by
-  convert edgeStar_pairwise_adjacent H x _ _ _;
-  · exact he.2;
-  · exact hf.2;
-  · exact hef
-
 
 end Erdos593
 end
@@ -9670,106 +8826,6 @@ universe u
 
 variable {W : Type u}
 
-theorem exists_disjoint_finite_obstruction_grid
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (huc : H.UncountablyChromatic) {S : Set W} (hS : S.Countable) :
-    ∃ D : ℕ → ℕ → Finset (Set W),
-      (∀ k r e, e ∈ D k r → e ∈ H.edges ∧ e ⊆ Sᶜ) ∧
-      (∀ ⦃k r l s⦄, (k, r) ≠ (l, s) →
-        Disjoint (finiteEdgeSupport (D k r)) (finiteEdgeSupport (D l s))) ∧
-      (∀ k r, ¬ ∃ c : W → Fin (k + 1),
-        (⟨(D k r : Set (Set W))⟩ : Hypergraph W).ProperColoring c) := by
-  
-  obtain ⟨E, hE⟩ := exists_disjoint_finite_obstruction_sequence H htri huc hS;
-  refine' ⟨ fun k r => E ( Nat.pair k r ), _, _, _ ⟩ <;> simp_all +decide;
-  · exact fun k r e he => hE.1 _ _ he;
-  · intro k r x hx; specialize hE; have := hE.2.2 ( Nat.pair k r ) ( fun w => Fin.castLE ( by linarith [ Nat.left_le_pair k r ] ) ( x w ) ) ; simp_all +decide [ Hypergraph.ProperColoring ] ;
-
-
-theorem exists_disjoint_countable_unbounded_chromatic_family
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (huc : H.UncountablyChromatic) {S : Set W} (hS : S.Countable) :
-    ∃ A : ℕ → Set (Set W),
-      (∀ r, (A r).Countable ∧ A r ⊆ H.edges ∧ ∀ e ∈ A r, e ⊆ Sᶜ) ∧
-      (∀ ⦃r s⦄, r ≠ s →
-        Disjoint (⋃ e ∈ A r, e) (⋃ e ∈ A s, e)) ∧
-      (∀ r k, 0 < k → ¬ ∃ c : W → Fin k,
-        (⟨A r⟩ : Hypergraph W).ProperColoring c) := by
-  obtain ⟨ D, hD₁, hD₂, hD₃ ⟩ := exists_disjoint_finite_obstruction_grid H htri huc hS;
-  refine' ⟨ fun r ↦ ⋃ k, ( D k r : Set ( Set W ) ), _, _, _ ⟩ <;> simp_all +decide [ Set.subset_def ];
-  · exact fun r => ⟨ fun i => Set.to_countable _, fun e k he => hD₁ k r e he |>.1, fun e k he x hx => hD₁ k r e he |>.2 x hx ⟩;
-  · intro r s hrs i k hi j l hj; specialize @hD₂ l r k s; simp_all +decide [ Set.disjoint_left ] ;
-    exact fun x hx₁ hx₂ => hD₂ ( Set.mem_iUnion₂.mpr ⟨ j, hj, hx₁ ⟩ ) ( Set.mem_iUnion₂.mpr ⟨ i, hi, hx₂ ⟩ );
-  · intro r k hk x hx;
-    contrapose! hD₃;
-    refine' ⟨ k - 1, r, fun w => Fin.castLE ( by omega ) ( x w ), _ ⟩;
-    intro e he; specialize hx e; simp_all +decide;
-    exact hx _ he
-
-theorem exists_disjoint_linear_exactly_countably_chromatic_family
-    (H : Hypergraph W) (htri : H.IsTripleSystem) (hlin : H.Linear)
-    (huc : H.UncountablyChromatic) {S : Set W} (hS : S.Countable) :
-    ∃ A : ℕ → Set (Set W),
-      (∀ r, (A r).Countable ∧ A r ⊆ H.edges ∧ (∀ e ∈ A r, e ⊆ Sᶜ) ∧
-        (⟨A r⟩ : Hypergraph W).IsTripleSystem ∧
-        (⟨A r⟩ : Hypergraph W).Linear ∧
-        (⟨A r⟩ : Hypergraph W).ColorableBy ℵ₀ ∧
-        ∀ k, 0 < k → ¬ ∃ c : W → Fin k,
-          (⟨A r⟩ : Hypergraph W).ProperColoring c) ∧
-      (∀ ⦃r s⦄, r ≠ s →
-        Disjoint (⋃ e ∈ A r, e) (⋃ e ∈ A s, e)) := by
-  obtain ⟨A, hA⟩ := exists_disjoint_countable_unbounded_chromatic_family H htri huc hS;
-  refine' ⟨ A, _, _ ⟩;
-  · intro r
-    obtain ⟨hA_countable, hA_subset, hA_avoid⟩ := hA.left r
-    have hA_linear : (⟨A r⟩ : Hypergraph W).Linear := by
-      exact fun e he f hf hef => hlin e ( hA_subset he ) f ( hA_subset hf ) hef
-    have hA_colorable : (⟨A r⟩ : Hypergraph W).ColorableBy ℵ₀ := by
-      exact colorable_of_countable_edges _ ( show ( ⟨ A r ⟩ : Hypergraph W ).IsTripleSystem from fun e he => htri e ( hA_subset he ) ) hA_countable
-    exact ⟨hA_countable, hA_subset, hA_avoid, by
-      exact fun e he => htri e ( hA_subset he ), hA_linear, hA_colorable, hA.right.right r⟩;
-  · exact hA.2.1
-
-theorem exists_disjoint_finite_obstruction_grid_avoid_edges
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (huc : H.UncountablyChromatic) {S : Set W} (hS : S.Countable)
-    {B : Set (Set W)} (hB : B.Countable) :
-    ∃ D : ℕ → ℕ → Finset (Set W),
-      (∀ k r e, e ∈ D k r → e ∈ H.edges ∧ e ∉ B ∧ e ⊆ Sᶜ) ∧
-      (∀ ⦃k r l s⦄, (k, r) ≠ (l, s) →
-        Disjoint (finiteEdgeSupport (D k r)) (finiteEdgeSupport (D l s))) ∧
-      (∀ k r, ¬ ∃ c : W → Fin (k + 1),
-        (⟨(D k r : Set (Set W))⟩ : Hypergraph W).ProperColoring c) := by
-  obtain ⟨H', hH'⟩ : ∃ H' : Hypergraph W, H'.edges = {e ∈ H.edges | e ∉ B} ∧ H'.IsTripleSystem ∧ H'.UncountablyChromatic := by
-    refine' ⟨ ⟨ { e | e ∈ H.edges ∧ e ∉ B } ⟩, rfl, _, _ ⟩;
-    · exact fun e he => htri e he.1;
-    · exact uncountablyChromatic_delete_countable_edges H htri huc hB;
-  convert exists_disjoint_finite_obstruction_grid H' hH'.2.1 hH'.2.2 hS using 1;
-  simp +decide [ hH'.1, and_assoc ]
-
-theorem exists_disjoint_countable_unbounded_chromatic_family_avoid
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (huc : H.UncountablyChromatic) {S : Set W} (hS : S.Countable)
-    {B : Set (Set W)} (hB : B.Countable) :
-    ∃ A : ℕ → Set (Set W),
-      (∀ r, (A r).Countable ∧ A r ⊆ H.edges ∧
-        (∀ e ∈ A r, e ∉ B ∧ e ⊆ Sᶜ)) ∧
-      (∀ ⦃r s⦄, r ≠ s →
-        Disjoint (⋃ e ∈ A r, e) (⋃ e ∈ A s, e)) ∧
-      (∀ r k, 0 < k → ¬ ∃ c : W → Fin k,
-        (⟨A r⟩ : Hypergraph W).ProperColoring c) := by
-  
-  obtain ⟨D, hD⟩ := exists_disjoint_finite_obstruction_grid_avoid_edges H htri huc hS hB;
-  refine' ⟨ fun r => ⋃ k, D k r, _, _, _ ⟩;
-  · exact fun r => ⟨ Set.countable_iUnion fun k => Finset.countable_toSet _, Set.iUnion_subset fun k => fun e he => hD.1 k r e he |>.1, fun e he => by obtain ⟨ k, hk ⟩ := Set.mem_iUnion.mp he; exact hD.1 k r e hk |>.2 ⟩;
-  · simp +contextual [ Set.disjoint_left, finiteEdgeSupport ] at hD ⊢;
-    grind;
-  · intro r k hk;
-    rintro ⟨ c, hc ⟩;
-    refine' hD.2.2 ( k - 1 ) r ⟨ fun x => Fin.castLE ( by omega ) ( c x ), _ ⟩;
-    intro e he; specialize hc e; aesop;
-
-
 end Erdos593
 end
 
@@ -9782,23 +8838,6 @@ namespace Erdos593
 universe u
 
 variable {W : Type u}
-
-theorem isTripleSystem_of_edges_subset (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (A : Set (Set W)) (hA : A ⊆ H.edges) :
-    (⟨A⟩ : Hypergraph W).IsTripleSystem := by
-  intro e he; specialize htri e; aesop;
-
-theorem linear_of_edges_subset (H : Hypergraph W) (hlin : H.Linear)
-    (A : Set (Set W)) (hA : A ⊆ H.edges) :
-    (⟨A⟩ : Hypergraph W).Linear := by
-  intro e he f hf b hb;
-  grind +suggestions
-
-theorem FTS.embeds_of_edges_subset {F : FTS} (H : Hypergraph W)
-    (A : Set (Set W)) (hA : A ⊆ H.edges)
-    (hemb : F.Embeds (⟨A⟩ : Hypergraph W)) : F.Embeds H := by
-  obtain ⟨ f, hf ⟩ := hemb;
-  exact ⟨ f, hf.1, fun e he => hA <| hf.2 e he ⟩
 
 def CleanLoose7EdgeCycle.ofEdgesSubset (H : Hypergraph W) (A : Set (Set W))
     (hA : A ⊆ H.edges) (c : CleanLoose7EdgeCycle (⟨A⟩ : Hypergraph W)) :
@@ -9819,13 +8858,6 @@ def E5CountableEmbeddingPrinciple : Prop :=
       ¬ ∃ c : W → Fin k, (⟨A⟩ : Hypergraph W).ProperColoring c) →
     looseCycle7.Embeds (⟨A⟩ : Hypergraph W)
 
-theorem e5_HK_loose7_of_countable_embedding_principle
-    (hp : E5CountableEmbeddingPrinciple.{u}) : E5_HK_loose7.{u} := by
-  intro H hH Hlin Huc;
-  intro huc
-  obtain ⟨A, hA⟩ := exists_exactly_countably_chromatic_subhypergraph_avoid hH Hlin huc (hS := Set.countable_empty) (hB := Set.countable_empty);
-  have := hp hH A Hlin Huc hA.1 hA.2.1 hA.2.2.2.2; exact FTS.embeds_of_edges_subset _ _ hA.2.1 this;
-
 def E5CountableCleanCyclePrinciple : Prop :=
   ∀ {W : Type u} (H : Hypergraph W) (A : Set (Set W)),
     H.IsTripleSystem → H.Linear → A.Countable → A ⊆ H.edges →
@@ -9833,46 +8865,12 @@ def E5CountableCleanCyclePrinciple : Prop :=
       ¬ ∃ c : W → Fin k, (⟨A⟩ : Hypergraph W).ProperColoring c) →
     Nonempty (CleanLoose7EdgeCycle (⟨A⟩ : Hypergraph W))
 
-theorem e5_HK_loose7_of_countable_cleanCycle_principle
-    (hp : E5CountableCleanCyclePrinciple.{u}) : E5_HK_loose7.{u} := by
-  intro H htri hlin huc;
-  have := @exists_exactly_countably_chromatic_subhypergraph_avoid H htri hlin;
-  intro huc
-  obtain ⟨A, hA_countable, hA_subset, hA_avoid, hA_colorable⟩ := this huc (Set.countable_empty) (Set.countable_empty);
-  obtain ⟨c, hc⟩ := hp htri A hlin ‹_› hA_countable hA_subset (fun k hk => hA_colorable.right k hk);
-  convert looseCycle7_embeds_of_cleanEdgeCycle htri hlin ( CleanLoose7EdgeCycle.ofEdgesSubset htri A hA_subset ⟨ c, hc, by assumption, by assumption, by assumption, by assumption, by assumption, by assumption ⟩ ) using 1
-
 def E5CountableIntersectionCyclePrinciple : Prop :=
   ∀ {W : Type u} (H : Hypergraph W) (A : Set (Set W)),
     H.IsTripleSystem → H.Linear → A.Countable → A ⊆ H.edges →
     (∀ k : ℕ, 0 < k →
       ¬ ∃ c : W → Fin k, (⟨A⟩ : Hypergraph W).ProperColoring c) →
     Nonempty (InducedEdgeIntersectionSevenCycle (⟨A⟩ : Hypergraph W))
-
-theorem e5_HK_loose7_of_countable_intersectionCycle_principle
-    (hp : E5CountableIntersectionCyclePrinciple.{u}) : E5_HK_loose7.{u} := by
-  apply e5_HK_loose7_of_countable_cleanCycle_principle;
-  intro W H A htri hlin hA hA' hA'';
-  obtain ⟨c⟩ := hp H A htri hlin hA hA' hA'';
-  exact ⟨ c.toClean ⟨ A ⟩ ( linear_of_edges_subset H hlin A hA' ) ⟩
-
-theorem exists_countable_core_with_loose7_avoid
-    (hp : E5CountableEmbeddingPrinciple.{u})
-    (H : Hypergraph W) (htri : H.IsTripleSystem) (hlin : H.Linear)
-    (huc : H.UncountablyChromatic) {S : Set W} (hS : S.Countable)
-    {B : Set (Set W)} (hB : B.Countable) :
-    ∃ A : Set (Set W),
-      A.Countable ∧ A ⊆ H.edges ∧
-      (∀ e ∈ A, e ∉ B ∧ e ⊆ Sᶜ) ∧
-      (⟨A⟩ : Hypergraph W).ColorableBy ℵ₀ ∧
-      (∀ k : ℕ, 0 < k →
-        ¬ ∃ c : W → Fin k, (⟨A⟩ : Hypergraph W).ProperColoring c) ∧
-      looseCycle7.Embeds (⟨A⟩ : Hypergraph W) := by
-  
-  obtain ⟨A, hA_countable, hA_subset, hA_avoid, hA_colorable, hA_unbounded⟩ := Erdos593.exists_exactly_countably_chromatic_subhypergraph_avoid (H := H) htri huc hS hB;
-  refine' ⟨ A, hA_countable, hA_subset, hA_avoid, hA_colorable, hA_unbounded, _ ⟩;
-  convert hp ⟨ A ⟩ A ( isTripleSystem_of_edges_subset H htri A hA_subset ) ( linear_of_edges_subset H hlin A hA_subset ) hA_countable ( Set.Subset.refl _ ) hA_unbounded using 1
-
 
 end Erdos593
 end
@@ -9895,51 +8893,6 @@ def Loose7FreeUniformFiniteBound : Prop :=
     H.IsTripleSystem → H.Linear → ¬ looseCycle7.Embeds H →
     ∃ c : W → Fin k, H.ProperColoring c
 
-theorem loose7Free_finitelyColorable_of_uniformFiniteBound
-    (h : Loose7FreeUniformFiniteBound.{u}) :
-    Loose7FreeFinitelyColorable.{u} := by
-  intro W H htri hlin hno;
-  exact ⟨ h.choose, h.choose_spec.1, h.choose_spec.2 H htri hlin hno ⟩
-
-theorem e5_HK_loose7_of_loose7Free_finitelyColorable
-    (h : Loose7FreeFinitelyColorable.{u}) : E5_HK_loose7.{u} := by
-  contrapose! h;
-  contrapose! h with h_contra;
-  apply e5_HK_loose7_of_countable_embedding_principle;
-  intro W H A htri hlin hcount hsub huc;
-  apply Classical.byContradiction
-  intro h_no_embedding;
-  exact huc ( Classical.choose ( h_contra ⟨ A ⟩ ( isTripleSystem_of_edges_subset H htri A hsub ) ( linear_of_edges_subset H hlin A hsub ) h_no_embedding ) ) ( Classical.choose_spec ( h_contra ⟨ A ⟩ ( isTripleSystem_of_edges_subset H htri A hsub ) ( linear_of_edges_subset H hlin A hsub ) h_no_embedding ) |>.1 ) ( Classical.choose_spec ( h_contra ⟨ A ⟩ ( isTripleSystem_of_edges_subset H htri A hsub ) ( linear_of_edges_subset H hlin A hsub ) h_no_embedding ) |>.2 )
-
-theorem e5_HK_loose7_of_uniformFiniteBound
-    (h : Loose7FreeUniformFiniteBound.{u}) : E5_HK_loose7.{u} := by
-  obtain ⟨ k, hk, hk ⟩ := h;
-  apply e5_HK_loose7_of_loose7Free_finitelyColorable;
-  intro W H htri hlin hloose;
-  exact ⟨ k, by assumption, hk H htri hlin hloose ⟩
-
-theorem countableEmbeddingPrinciple_of_loose7Free_finitelyColorable
-    (h : Loose7FreeFinitelyColorable.{u}) :
-    E5CountableEmbeddingPrinciple.{u} := by
-  intro W H A htri hlin hAcount hAsub hunbounded; contrapose! hunbounded;
-  convert h ⟨ A ⟩ ( isTripleSystem_of_edges_subset H htri A hAsub ) ( linear_of_edges_subset H hlin A hAsub ) hunbounded
-
-theorem countableEmbeddingPrinciple_of_uniformFiniteBound
-    (h : Loose7FreeUniformFiniteBound.{u}) :
-    E5CountableEmbeddingPrinciple.{u} := by
-  exact countableEmbeddingPrinciple_of_loose7Free_finitelyColorable ( loose7Free_finitelyColorable_of_uniformFiniteBound h )
-
-theorem looseCycle7_embeds_of_not_colorable_bound
-    (k : ℕ)
-    (hbound : ∀ {W : Type u} (K : Hypergraph W),
-      K.IsTripleSystem → K.Linear → ¬ looseCycle7.Embeds K →
-      ∃ c : W → Fin k, K.ProperColoring c)
-    {W : Type u} (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (hlin : H.Linear)
-    (hncol : ¬ ∃ c : W → Fin k, H.ProperColoring c) :
-    looseCycle7.Embeds H := by
-  exact Classical.not_not.1 fun h => hncol <| hbound H htri hlin h
-
 end Erdos593
 end
 
@@ -9959,83 +8912,10 @@ def EdgeIntersectionColoring (H : Hypergraph W) (C : Type v) (c : H.edges → C)
 def EdgeIntersectionColorable (H : Hypergraph W) (C : Type v) : Prop :=
   ∃ c : H.edges → C, EdgeIntersectionColoring H C c
 
-theorem disjoint_of_edgeIntersectionColoring_same
-    (H : Hypergraph W) {C : Type v} {c : H.edges → C}
-    (hc : EdgeIntersectionColoring H C c) {e f : H.edges}
-    (hcol : c e = c f) (hne : e ≠ f) : Disjoint (e : Set W) (f : Set W) := by
-  exact Set.disjoint_left.mpr fun x hex hfx => by have := hc ( show ( edgeIntersectionGraph H ).Adj e f from by
-                                                                exact edgeIntersectionGraph_adj_of_common_vertex H hne hex hfx ) ; simp_all +decide [ Set.disjoint_left ] ;
-
 noncomputable def edgeMark (H : Hypergraph W) (htri : H.IsTripleSystem) : H.edges → W :=
   fun e => Classical.choose (Set.nonempty_of_ncard_ne_zero (by
     rw [htri e.1 e.2]
     norm_num))
-
-theorem edgeMark_mem (H : Hypergraph W) (htri : H.IsTripleSystem) (e : H.edges) :
-    edgeMark H htri e ∈ e.1 := by
-  exact Classical.choose_spec ( Set.nonempty_of_ncard_ne_zero ( by rw [ htri e.1 e.2 ] ; norm_num ) )
-
-theorem properColoring_of_edgeIntersectionColoring
-    (H : Hypergraph W) (htri : H.IsTripleSystem) (q : ℕ)
-    (c : H.edges → Fin q) (hc : EdgeIntersectionColoring H (Fin q) c) :
-    ∃ d : W → (Fin q → Bool), H.ProperColoring d := by
-  
-  set d : W → Fin q → Prop := fun v i => ∃ e : H.edges, c e = i ∧ edgeMark H htri e = v;
-  refine' ⟨ _, _ ⟩;
-  convert fun v i => decide ( d v i ) using 1;
-  exact fun v i => Classical.propDecidable _;
-  intro e he;
-  
-  obtain ⟨v, hv⟩ : ∃ v ∈ e, v ≠ edgeMark H htri ⟨e, he⟩ := by
-    have := htri e he;
-    exact Set.exists_ne_of_one_lt_ncard ( by linarith ) _;
-  refine' ⟨ edgeMark H htri ⟨ e, he ⟩, _, v, _, _ ⟩ <;> simp_all +decide [ funext_iff ];
-  · exact edgeMark_mem H htri ⟨ e, he ⟩;
-  · use c ⟨ e, he ⟩ ; simp_all +decide [ d ] ;
-    push_neg;
-    refine' Or.inl ⟨ ⟨ e, he, rfl, rfl ⟩, _ ⟩;
-    intro a ha hca hva; have := hc ( show ( edgeIntersectionGraph H ).Adj ⟨ a, ha ⟩ ⟨ e, he ⟩ from by
-                                      exact edgeIntersectionGraph_adj_of_common_vertex H ( by aesop ) ( edgeMark_mem H htri ⟨ a, ha ⟩ ) ( by aesop ) ) ; simp_all +decide [ Set.disjoint_left ] ;
-
-theorem colorableBy_of_edgeIntersectionColorable_fin
-    (H : Hypergraph W) (htri : H.IsTripleSystem) (q : ℕ)
-    (hc : EdgeIntersectionColorable H (Fin q)) :
-    H.ColorableBy (Cardinal.mk (ULift.{u} (Fin q → Bool))) := by
-  have := properColoring_of_edgeIntersectionColoring H htri q hc.choose hc.choose_spec;
-  convert this using 1;
-  constructor <;> intro h <;> cases' h with d hd;
-  · convert this using 1;
-  · refine' ⟨ _, _ ⟩;
-    exact fun w => Classical.choice ( Cardinal.eq.1 ( by simp +decide [ Cardinal.mk_fintype ] ) ) ( ULift.up ( d w ) );
-    intro e he; specialize hd e he; aesop;
-
-theorem not_edgeIntersectionColorable_of_not_signatureColorable
-    (H : Hypergraph W) (htri : H.IsTripleSystem) (q : ℕ)
-    (hno : ¬ ∃ d : W → (Fin q → Bool), H.ProperColoring d) :
-    ¬ EdgeIntersectionColorable H (Fin q) := by
-  contrapose! hno; have := properColoring_of_edgeIntersectionColoring H htri q hno.choose hno.choose_spec; aesop;
-
-theorem edgeIntersection_not_finitely_colorable_of_unbounded
-    (H : Hypergraph W) (htri : H.IsTripleSystem)
-    (hunbounded : ∀ k : ℕ, 0 < k →
-      ¬ ∃ d : W → Fin k, H.ProperColoring d) :
-    ∀ q : ℕ, 0 < q → ¬ EdgeIntersectionColorable H (Fin q) := by
-  intro q hq_pos hq_colorable
-  obtain ⟨c, hc⟩ := hq_colorable;
-  obtain ⟨d, hd⟩ := properColoring_of_edgeIntersectionColoring H htri q c hc;
-  exact hunbounded ( Fintype.card ( Fin q → Bool ) ) ( Fintype.card_pos_iff.mpr ⟨ fun _ => Bool.true ⟩ ) ⟨ fun w => Fintype.equivFin _ ( d w ), by
-    intro e he; specialize hd e he; aesop; ⟩
-
-theorem countableCore_edgeIntersection_unbounded
-    (H : Hypergraph W) (A : Set (Set W))
-    (htri : H.IsTripleSystem) (hA : A ⊆ H.edges)
-    (hunbounded : ∀ k : ℕ, 0 < k →
-      ¬ ∃ d : W → Fin k, (⟨A⟩ : Hypergraph W).ProperColoring d) :
-    ∀ q : ℕ, 0 < q →
-      ¬ EdgeIntersectionColorable (⟨A⟩ : Hypergraph W) (Fin q) := by
-  exact fun q hq =>
-    edgeIntersection_not_finitely_colorable_of_unbounded
-      (⟨A⟩ : Hypergraph W) (fun e he => htri e (hA he)) hunbounded q hq
 
 end Erdos593
 end
@@ -10063,7 +8943,7 @@ theorem looseCycle7_sub_hkMn3 : looseCycle7.Sub (hkMn 3) := by
   unfold FTS.Sub;
   by_contra h;
   push_neg at h;
-  exact absurd ( h ( fun x => if x = Sum.inl 0 then ( 0, 0, 0 ) else if x = Sum.inl 1 then ( 1, 0, 0 ) else if x = Sum.inl 2 then ( 2, 1, 0 ) else if x = Sum.inl 3 then ( 0, 1, 1 ) else if x = Sum.inl 4 then ( 1, 1, 1 ) else if x = Sum.inl 5 then ( 2, 2, 1 ) else if x = Sum.inl 6 then ( 1, 0, 1 ) else if x = Sum.inr 0 then ( 2, 0, 0 ) else if x = Sum.inr 1 then ( 0, 0, 1 ) else if x = Sum.inr 2 then ( 1, 1, 0 ) else if x = Sum.inr 3 then ( 2, 1, 1 ) else if x = Sum.inr 4 then ( 0, 1, 2 ) else if x = Sum.inr 5 then ( 0, 0, 2 ) else ( 2, 0, 1 ) ) ( by decide ) ) ( by decide )
+  exact absurd ( h ( fun (x : Fin 7 ⊕ Fin 7) => if x = Sum.inl 0 then ( 0, 0, 0 ) else if x = Sum.inl 1 then ( 1, 0, 0 ) else if x = Sum.inl 2 then ( 2, 1, 0 ) else if x = Sum.inl 3 then ( 0, 1, 1 ) else if x = Sum.inl 4 then ( 1, 1, 1 ) else if x = Sum.inl 5 then ( 2, 2, 1 ) else if x = Sum.inl 6 then ( 1, 0, 1 ) else if x = Sum.inr 0 then ( 2, 0, 0 ) else if x = Sum.inr 1 then ( 0, 0, 1 ) else if x = Sum.inr 2 then ( 1, 1, 0 ) else if x = Sum.inr 3 then ( 2, 1, 1 ) else if x = Sum.inr 4 then ( 0, 1, 2 ) else if x = Sum.inr 5 then ( 0, 0, 2 ) else ( 2, 0, 1 ) ) (by unfold Function.Injective; decide) ) (by decide)
 
 def HKRealizes (H : Hypergraph W) (Z : Fin 3 → Fin 3 → W)
     (X Y : Fin 3 → W) : Prop :=
@@ -10087,8 +8967,14 @@ theorem hkMn3_embeds_of_realizations (H : Hypergraph W)
   · intro x y hxy;
     rcases x with ⟨ x₁, x₂, x₃ ⟩ ; rcases y with ⟨ y₁, y₂, y₃ ⟩ ; simp +decide at hxy ⊢;
     grind;
-  · simp +decide [ hkMn ];
-    rintro e a b c rfl; simp +decide [ *, Set.image_insert_eq, Set.image_singleton ] ;
+  · intro e he
+    change e ∈ Finset.image _ _ at he
+    obtain ⟨⟨a, b, c⟩, -, rfl⟩ := Finset.mem_image.mp he
+    change (fun x : Fin 3 × Fin 3 × Fin 3 =>
+      if x.1 = 0 then X x.2.1 x.2.2 else if x.1 = 1 then Y x.2.1 x.2.2 else Z x.2.1 x.2.2) ''
+      (↑({(0, a, b), (1, a, c), (2, b, c)} : Finset (Fin 3 × Fin 3 × Fin 3)) :
+        Set (Fin 3 × Fin 3 × Fin 3)) ∈ H.edges
+    simpa [Set.image_insert_eq, Set.image_singleton] using (hreal a).2.2.2.2.2 b c
 
 noncomputable def hkRealizationSupport (X Y : Fin 3 → W) : Finset W := by
   classical
@@ -10096,15 +8982,16 @@ noncomputable def hkRealizationSupport (X Y : Fin 3 → W) : Finset W := by
 
 lemma hkRealizationSupport_card_le (X Y : Fin 3 → W) :
     (hkRealizationSupport X Y).card ≤ 6 := by
-  convert Finset.card_union_le ( Finset.image X Finset.univ ) ( Finset.image Y Finset.univ ) |> le_trans <| add_le_add ( Finset.card_image_le ) ( Finset.card_image_le ) using 1
-
-lemma mem_hkRealizationSupport_left (X Y : Fin 3 → W) (i : Fin 3) :
-    X i ∈ hkRealizationSupport X Y := by
-  simp +decide [ hkRealizationSupport, Finset.mem_union, Finset.mem_image ]
-
-lemma mem_hkRealizationSupport_right (X Y : Fin 3 → W) (i : Fin 3) :
-    Y i ∈ hkRealizationSupport X Y := by
-  convert Finset.mem_union.mpr ( Or.inr <| Finset.mem_image.mpr ⟨ i, Finset.mem_univ _, rfl ⟩ ) using 1
+  classical
+  unfold hkRealizationSupport
+  refine (Finset.card_union_le _ _).trans ?_
+  have hx : (Finset.univ.image X).card ≤ 3 := by
+    simpa only [Finset.card_univ, Fintype.card_fin] using
+      (Finset.card_image_le (f := X) (s := (Finset.univ : Finset (Fin 3))))
+  have hy : (Finset.univ.image Y).card ≤ 3 := by
+    simpa only [Finset.card_univ, Fintype.card_fin] using
+      (Finset.card_image_le (f := Y) (s := (Finset.univ : Finset (Fin 3))))
+  exact Nat.add_le_add hx hy
 
 lemma hk_support_disjoint_cross
     (X Y X' Y' : Fin 3 → W)
@@ -10294,56 +9181,60 @@ lemma HKcl_blockerClosed (H : Hypergraph W) (X : Set W)
 
 lemma HKCloseStep_card_le (H : Hypergraph W) (htri : H.IsTripleSystem)
     (X : Set W) : #(HKCloseStep H X) ≤ #X + ℵ₀ := by
-  have h_card_le : #(DCloseStep H 2 X) ≤ #X + ℵ₀ := by
-    convert DCloseStep_card_le H htri 2 X using 1;
-  have h_card_le : #(⋃ (Z : Fin 3 → Fin 3 → X), (hkBlocker H (fun i j => Z i j) : Set W)) ≤ #(Fin 3 → Fin 3 → X) * 18 := by
-    refine' le_trans ( Cardinal.mk_iUnion_le _ ) _;
-    gcongr;
-    refine' ciSup_le' _;
-    intro Z; exact (by
-    by_cases h : ∃ S : Finset W, HKBlocks H ( fun i j => ( Z i j : W ) ) S <;> simp_all +decide [ hkBlocker ];
-    exact h.choose_spec.1);
-  by_cases hX : Infinite X <;> simp_all +decide [ Cardinal.mk_fintype, Cardinal.mk_pi ];
-  · refine' le_trans ( Cardinal.mk_union_le _ _ ) _;
-    refine' le_trans ( add_le_add ‹_› _ ) _;
-    exact ( #X ^ 3 ) ^ 3 * 18;
-    · refine' le_trans _ h_card_le;
-      refine' Cardinal.mk_le_mk_of_subset _;
-      intro v hv; obtain ⟨ Z, hZ₁, hZ₂ ⟩ := hv; exact Set.mem_iUnion.2 ⟨ fun i j => ⟨ Z i j, hZ₁ i j ⟩, hZ₂ ⟩ ;
-    · simp +decide [ Cardinal.add_eq_max, Cardinal.mul_eq_max, Cardinal.power_nat_eq ];
-      exact le_trans ( mul_le_mul_left' ( Cardinal.nat_lt_aleph0 18 |> le_of_lt ) _ ) ( by simp +decide [ Cardinal.mul_eq_max ] );
-  · convert Cardinal.mk_union_le _ _ |> le_trans <| add_le_add ‹#↑(DCloseStep H 2 X) ≤ #↑X + ℵ₀› h_card_le using 1;
-    · congr with x ; simp +decide [ HKCloseStep ];
-      constructor <;> intro h;
-      · rcases h with ( h | ⟨ Z, hZ₁, hZ₂ ⟩ );
-        · exact Or.inl h;
-        · exact Or.inr ⟨ fun i j => ⟨ Z i j, hZ₁ i j ⟩, by simpa [ Subtype.ext_iff ] using hZ₂ ⟩;
-      · exact h.imp id fun ⟨ Z, hZ ⟩ => ⟨ _, fun i j => Z i j |>.2, hZ ⟩;
-    · haveI := Fintype.ofFinite X; simp +decide [ Cardinal.mk_fintype ] ;
-      rw [ Cardinal.add_eq_left ];
-      · norm_num;
-      · exact_mod_cast Cardinal.nat_lt_aleph0 _ |> le_of_lt
+  let K : Cardinal := #X + ℵ₀
+  have hK : ℵ₀ ≤ K := le_add_left le_rfl
+  have hX : #X ≤ K := le_add_right le_rfl
+  let B := fun Z : Fin 3 → Fin 3 → X => (hkBlocker H (fun i j => Z i j) : Set W)
+  have hB : ∀ Z, #(B Z) ≤ 18 := by
+    intro Z
+    by_cases h : ∃ S : Finset W, HKBlocks H (fun i j => (Z i j : W)) S
+    · simpa [B, hkBlocker, h] using h.choose_spec.1
+    · simp [B, hkBlocker, h]
+  have hI : #(Fin 3 → Fin 3 → X) ≤ K := by
+    simp only [Cardinal.mk_arrow, Cardinal.mk_fin, Cardinal.lift_uzero, Cardinal.lift_natCast,
+      Cardinal.power_natCast]
+    calc
+      (#X ^ 3) ^ 3 ≤ (K ^ 3) ^ 3 := by gcongr
+      _ = K := by simp only [Cardinal.power_nat_eq hK (by decide : 1 ≤ 3)]
+  have hUnion : #(⋃ Z, B Z) ≤ K := by
+    refine (Cardinal.mk_iUnion_le B).trans ?_
+    calc
+      _ ≤ K * K := mul_le_mul' hI (ciSup_le' fun Z =>
+        (hB Z).trans ((Cardinal.nat_lt_aleph0 18).le.trans hK))
+      _ = K := Cardinal.mul_eq_self hK
+  have hEq : HKCloseStep H X = DCloseStep H 2 X ∪ ⋃ Z, B Z := by
+    ext v
+    simp only [HKCloseStep, Set.mem_union, Set.mem_setOf_eq, Set.mem_iUnion]
+    apply or_congr_right
+    constructor
+    · rintro ⟨Z, hZ, hv⟩
+      exact ⟨fun i j => ⟨Z i j, hZ i j⟩, hv⟩
+    · rintro ⟨Z, hv⟩
+      exact ⟨fun i j => Z i j, fun i j => (Z i j).property, hv⟩
+  rw [hEq]
+  exact (Cardinal.mk_union_le _ _).trans ((add_le_add (DCloseStep_card_le H htri 2 X) hUnion).trans_eq
+    (Cardinal.add_eq_left hK le_rfl))
 
 lemma HKcl_card_le (H : Hypergraph W) (htri : H.IsTripleSystem) (X : Set W) :
     #(HKcl H X) ≤ #X + ℵ₀ := by
-  convert Cardinal.mk_iUnion_le _ |> le_trans <| _;
-  rotate_left;
-  exact ULift ℕ
-  exact fun i => HKCloseIter H X i.down
-  generalize_proofs at *;
-  · refine' le_trans ( mul_le_mul_left' ( ciSup_le _ ) _ ) _;
-    exact #X + ℵ₀;
-    · intro x;
-      induction' x.down with k ih;
-      · exact le_add_right ( by rfl );
-      · convert le_trans ( HKCloseStep_card_le H htri ( HKCloseIter H X k ) ) _ using 1;
-        convert add_le_add_right ih ℵ₀ using 1;
-        · rw [ add_comm ];
-        · rw [ add_comm, Cardinal.add_eq_max ];
-          · rw [ Cardinal.add_eq_right ]; all_goals exact le_max_left _ _;
-          · norm_num;
-    · simp +decide [ Cardinal.mk_nat ];
-  · ext; simp [HKcl]
+  let K : Cardinal := #X + ℵ₀
+  have hK : ℵ₀ ≤ K := le_add_left le_rfl
+  have hIter : ∀ n, #(HKCloseIter H X n) ≤ K := by
+    intro n
+    induction n with
+    | zero => exact le_add_right le_rfl
+    | succ n ih =>
+      calc
+        #(HKCloseIter H X (n + 1)) ≤ #(HKCloseIter H X n) + ℵ₀ := HKCloseStep_card_le H htri _
+        _ ≤ K + ℵ₀ := add_le_add ih le_rfl
+        _ = K := Cardinal.add_eq_left hK hK
+  unfold HKcl
+  have hUnion := Cardinal.mk_iUnion_le_lift (HKCloseIter H X)
+  simp only [Cardinal.lift_uzero, Cardinal.mk_nat, Cardinal.lift_aleph0] at hUnion
+  refine hUnion.trans ?_
+  calc
+    _ ≤ K * K := mul_le_mul' hK (ciSup_le' hIter)
+    _ = K := Cardinal.mul_eq_self hK
 
 structure HKFiltration (H : Hypergraph W) where
   Idx : Type u
@@ -10471,7 +9362,7 @@ theorem exists_hk_filtration (H : Hypergraph W)
       have heq : Cardinal.mk (Set.Iic a) = Cardinal.mk (Set.Iio a) + 1 := by
         rw [← Cardinal.mk_singleton (a : Idx), ← Cardinal.mk_union_of_disjoint]
         · congr with x; simp [le_iff_lt_or_eq, eq_comm]
-        · grind
+        · exact Set.disjoint_left.mpr (by intro x hx hx'; exact (ne_of_lt hx) (Set.mem_singleton_iff.mp hx'))
       rw [heq]
       exact Cardinal.add_lt_of_lt (le_of_lt hbig) hiio
         (lt_of_le_of_lt (Cardinal.nat_lt_aleph0 1 |>.le) hbig)

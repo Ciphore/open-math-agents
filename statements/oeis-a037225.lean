@@ -16,7 +16,8 @@ namespace OMA.S_oeis_a037225
 def a (n : ℕ) : ℕ := (2 * n + 1).totient
 
 theorem main :
-    (∀ n : ℕ, (2 * n + 1).Composite → ¬ a n ∣ 2 * n) ∧ ∀ n : ℕ, a n ≠ n := by
+    (∀ n : ℕ, (∃ d : ℕ, d ∣ 2 * n + 1 ∧ 1 < d ∧ d < 2 * n + 1) → ¬ a n ∣ 2 * n) ∧
+    ∀ n : ℕ, a n ≠ n := by
   sorry
 
 end OMA.S_oeis_a037225
